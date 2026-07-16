@@ -3,7 +3,7 @@ import SwiftUI
 
 struct AboutSettingsView: View {
     var body: some View {
-        SettingsPage(title: "关于", subtitle: "Rdc for macOS") {
+        SettingsPage(title: "关于", subtitle: "RDGDesk for macOS") {
             SettingsCard {
                 VStack(alignment: .leading, spacing: 18) {
                     HStack(spacing: 18) {

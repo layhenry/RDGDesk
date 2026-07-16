@@ -14,7 +14,7 @@ final class ResourceLibrarySidebarTests: XCTestCase {
     func testBuildsIndentedTreeRowsWithIconsDisclosureBadgesAndSelection() throws {
         let document = try parsedFixture()
         let library = RdcImportedLibrary(
-            document: document, sourceID: "source-1", sourceName: "temp2.rdg"
+            document: document, sourceID: "source-1", sourceName: "example.rdg"
         )
         let sidebar = ResourceLibrarySidebarState(
             document: document,
@@ -27,8 +27,8 @@ final class ResourceLibrarySidebarTests: XCTestCase {
             "示例资源库",
             "生产环境",
             "业务服务器",
-            "Windows Server A",
-            "Windows Server B"
+            "Example Server A",
+            "Example Server B"
         ])
 
         XCTAssertEqual(sidebar.rows.map(\.indentationLevel), [0, 1, 2, 3, 3])
@@ -60,7 +60,7 @@ final class ResourceLibrarySidebarTests: XCTestCase {
             "示例资源库",
             "生产环境",
             "业务服务器",
-            "Windows Server B"
+            "Example Server B"
         ])
         XCTAssertEqual(sidebar.rows.map(\.indentationLevel), [0, 1, 2, 3])
     }

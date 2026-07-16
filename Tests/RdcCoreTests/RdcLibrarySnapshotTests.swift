@@ -51,7 +51,7 @@ final class RdcLibrarySnapshotTests: XCTestCase {
 
     func testNormalizationDoesNotTurnLocallyCreatedResourcesIntoImportedResources() throws {
         var snapshot = RdcLibrarySnapshot(
-            sourceID: "source-1", sourceName: "temp2.rdg",
+            sourceID: "source-1", sourceName: "example.rdg",
             document: try fixtureDocument(named: "minimal-rdcman")
         )
         snapshot.root.groups.append(RdcGroupSnapshot(
@@ -105,7 +105,7 @@ final class RdcLibrarySnapshotTests: XCTestCase {
     func testSnapshotRestoresTreeWithoutDPAPICiphertext() throws {
         let document = try fixtureDocument(named: "minimal-rdcman")
         let snapshot = RdcLibrarySnapshot(
-            sourceID: "source-1", sourceName: "temp2.rdg", document: document
+            sourceID: "source-1", sourceName: "example.rdg", document: document
         )
 
         let encoded = try JSONEncoder().encode(snapshot)
@@ -126,7 +126,7 @@ final class RdcLibrarySnapshotTests: XCTestCase {
     func testSnapshotRoundTripPreservesOnlyLibraryDisplayFields() throws {
         let snapshot = RdcLibrarySnapshot(
             sourceID: "source-1",
-            sourceName: "temp2.rdg",
+            sourceName: "example.rdg",
             document: try fixtureDocument(named: "minimal-rdcman")
         )
 
@@ -143,7 +143,7 @@ final class RdcLibrarySnapshotTests: XCTestCase {
         XCTAssertEqual(decoded.root.groups.first?.name, "生产环境")
         XCTAssertEqual(
             decoded.root.groups.first?.groups.first?.servers.first?.displayName,
-            "Windows Server A"
+            "Example Server A"
         )
     }
 

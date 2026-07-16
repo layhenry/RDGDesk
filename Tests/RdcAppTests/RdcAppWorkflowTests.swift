@@ -14,7 +14,7 @@ final class RdcAppWorkflowTests: XCTestCase {
 
     func testClipboardRequiresExplicitClickAndSecureAttentionUsesActiveSession() async throws {
         let snapshot = RdcLibrarySnapshot(
-            sourceID: "clipboard-source", sourceName: "temp2.rdg", document: testDocument()
+            sourceID: "clipboard-source", sourceName: "example.rdg", document: testDocument()
         )
         let engine = AppRecordingSessionEngine()
         let pasteboard = AppTextPasteboard(text: "hello 你好")
@@ -52,7 +52,7 @@ final class RdcAppWorkflowTests: XCTestCase {
 
     func testRemoteClipboardIsScopedAndWrittenToInjectedPasteboard() async throws {
         let snapshot = RdcLibrarySnapshot(
-            sourceID: "remote-clipboard", sourceName: "temp2.rdg", document: testDocument()
+            sourceID: "remote-clipboard", sourceName: "example.rdg", document: testDocument()
         )
         let engine = AppRecordingSessionEngine()
         let pasteboard = AppTextPasteboard()
@@ -94,7 +94,7 @@ final class RdcAppWorkflowTests: XCTestCase {
 
     func testClipboardRejectsOversizeTextWithoutForwarding() async throws {
         let snapshot = RdcLibrarySnapshot(
-            sourceID: "large-clipboard", sourceName: "temp2.rdg", document: testDocument()
+            sourceID: "large-clipboard", sourceName: "example.rdg", document: testDocument()
         )
         let engine = AppRecordingSessionEngine()
         let pasteboard = AppTextPasteboard(text: String(repeating: "a", count: 1_048_577))
@@ -126,7 +126,7 @@ final class RdcAppWorkflowTests: XCTestCase {
         let document = testDocument()
         let snapshot = RdcLibrarySnapshot(
             sourceID: "source-restart",
-            sourceName: "temp2.rdg",
+            sourceName: "example.rdg",
             document: document
         )
         let credentialID = "global-credential"
@@ -168,7 +168,7 @@ final class RdcAppWorkflowTests: XCTestCase {
     func testLaunchLoadsSettingsButHonorsRestoreLastLibraryDisabled() async {
         let snapshot = RdcLibrarySnapshot(
             sourceID: "source-restore-disabled",
-            sourceName: "temp2.rdg",
+            sourceName: "example.rdg",
             document: testDocument()
         )
         let preferences = RdcGeneralPreferences(
@@ -195,7 +195,7 @@ final class RdcAppWorkflowTests: XCTestCase {
     func testPersistedSourceIDSidebarRowsSelectRealServersImmediately() async throws {
         let snapshot = RdcLibrarySnapshot(
             sourceID: "persisted-source-that-is-not-the-compatibility-id",
-            sourceName: "temp2.rdg",
+            sourceName: "example.rdg",
             document: twoServerDocument()
         )
         let model = makeModel(
@@ -224,7 +224,7 @@ final class RdcAppWorkflowTests: XCTestCase {
 
     func testResourceOperationsPersistOnceAndKeepSelectionStable() async throws {
         let snapshot = RdcLibrarySnapshot(
-            sourceID: "resource-edits", sourceName: "temp2.rdg", document: nestedDocument()
+            sourceID: "resource-edits", sourceName: "example.rdg", document: nestedDocument()
         )
         let store = AppControlledConfigurationStore(
             configuration: RdcAppConfiguration(lastLibrary: snapshot)
@@ -258,7 +258,7 @@ final class RdcAppWorkflowTests: XCTestCase {
 
     func testEveryPropertyAndMoveOperationPersistsOnceAndPreservesBindings() async throws {
         let snapshot = RdcLibrarySnapshot(
-            sourceID: "all-resource-edits", sourceName: "temp2.rdg", document: nestedDocument()
+            sourceID: "all-resource-edits", sourceName: "example.rdg", document: nestedDocument()
         )
         let serverID = try XCTUnwrap(snapshot.root.groups.first?.servers.first?.id)
         let groupID = try XCTUnwrap(snapshot.root.groups.first?.id)
@@ -294,7 +294,7 @@ final class RdcAppWorkflowTests: XCTestCase {
 
     func testEditingConnectedServerDoesNotDisconnectAndUpdatesNextRequest() async throws {
         let snapshot = RdcLibrarySnapshot(
-            sourceID: "connected-edit", sourceName: "temp2.rdg", document: testDocument()
+            sourceID: "connected-edit", sourceName: "example.rdg", document: testDocument()
         )
         let engine = AppRecordingSessionEngine()
         let model = makeModel(
@@ -323,7 +323,7 @@ final class RdcAppWorkflowTests: XCTestCase {
 
     func testDeleteActiveServerDisconnectsBeforePersistingAndCleansBinding() async throws {
         let snapshot = RdcLibrarySnapshot(
-            sourceID: "delete-active", sourceName: "temp2.rdg", document: nestedDocument()
+            sourceID: "delete-active", sourceName: "example.rdg", document: nestedDocument()
         )
         let serverID = try XCTUnwrap(snapshot.root.groups.first?.servers.first?.id)
         let credentialID = "deleted-only-credential"
@@ -363,7 +363,7 @@ final class RdcAppWorkflowTests: XCTestCase {
 
     func testFailedVerifiedDisconnectKeepsSessionAndPreventsDeletionCommit() async throws {
         let snapshot = RdcLibrarySnapshot(
-            sourceID: "disconnect-fail", sourceName: "temp2.rdg", document: testDocument()
+            sourceID: "disconnect-fail", sourceName: "example.rdg", document: testDocument()
         )
         let store = AppControlledConfigurationStore(configuration: .init(lastLibrary: snapshot))
         let engine = AppRecordingSessionEngine(failsVerifiedDisconnect: true)
@@ -391,7 +391,7 @@ final class RdcAppWorkflowTests: XCTestCase {
 
     func testDeleteInactiveServerDoesNotDisconnectAndSharedCredentialSurvives() async throws {
         let snapshot = RdcLibrarySnapshot(
-            sourceID: "delete-shared", sourceName: "temp2.rdg", document: twoServerDocument()
+            sourceID: "delete-shared", sourceName: "example.rdg", document: twoServerDocument()
         )
         let ids = snapshot.root.servers.compactMap(\.id)
         let credentialID = "shared-credential"
@@ -422,7 +422,7 @@ final class RdcAppWorkflowTests: XCTestCase {
 
     func testRecursiveGroupDeletionAndLibraryRemovalCleanEveryBinding() async throws {
         let snapshot = RdcLibrarySnapshot(
-            sourceID: "recursive-delete", sourceName: "temp2.rdg", document: nestedDocument()
+            sourceID: "recursive-delete", sourceName: "example.rdg", document: nestedDocument()
         )
         let groupID = try XCTUnwrap(snapshot.root.groups.first?.id)
         let serverID = try XCTUnwrap(snapshot.root.groups.first?.servers.first?.id)
@@ -452,7 +452,7 @@ final class RdcAppWorkflowTests: XCTestCase {
 
     func testResourceDeleteKeychainFailureAndConfigurationFailureAreAtomic() async throws {
         let snapshot = RdcLibrarySnapshot(
-            sourceID: "atomic-delete", sourceName: "temp2.rdg", document: testDocument()
+            sourceID: "atomic-delete", sourceName: "example.rdg", document: testDocument()
         )
         let serverID = try XCTUnwrap(snapshot.root.servers.first?.id)
         let credentialID = "atomic-credential"
@@ -501,7 +501,7 @@ final class RdcAppWorkflowTests: XCTestCase {
 
     func testDeletionRequestDoesNotOptimisticallyRemoveAndFailureKeepsRequest() async throws {
         let snapshot = RdcLibrarySnapshot(
-            sourceID: "confirm-delete", sourceName: "temp2.rdg", document: testDocument()
+            sourceID: "confirm-delete", sourceName: "example.rdg", document: testDocument()
         )
         let serverID = try XCTUnwrap(snapshot.root.servers.first?.id)
         let initial = RdcAppConfiguration(lastLibrary: snapshot)
@@ -536,7 +536,7 @@ final class RdcAppWorkflowTests: XCTestCase {
 
     func testFailedDeletionAfterOwnerDisappearsDoesNotRestoreInvisibleRequest() async throws {
         let snapshot = RdcLibrarySnapshot(
-            sourceID: "owner-disappeared-delete", sourceName: "temp2.rdg",
+            sourceID: "owner-disappeared-delete", sourceName: "example.rdg",
             document: testDocument()
         )
         let serverID = try XCTUnwrap(snapshot.root.servers.first?.id)
@@ -608,7 +608,7 @@ final class RdcAppWorkflowTests: XCTestCase {
 
     func testPersistentCredentialEditorBlocksButDoesNotLosePendingDeletion() async throws {
         let snapshot = RdcLibrarySnapshot(
-            sourceID: "credential-blocked-delete", sourceName: "temp2.rdg",
+            sourceID: "credential-blocked-delete", sourceName: "example.rdg",
             document: testDocument()
         )
         let model = makeModel(
@@ -642,7 +642,7 @@ final class RdcAppWorkflowTests: XCTestCase {
 
     func testCompletedOldDeletionDoesNotClearNewerConfirmationRequest() async throws {
         let snapshot = RdcLibrarySnapshot(
-            sourceID: "rapid-confirm-delete", sourceName: "temp2.rdg",
+            sourceID: "rapid-confirm-delete", sourceName: "example.rdg",
             document: twoServerDocument()
         )
         let ids = snapshot.root.servers.compactMap(\.id)
@@ -684,7 +684,7 @@ final class RdcAppWorkflowTests: XCTestCase {
 
     func testLibraryReplacementAfterConfirmationCannotRemoveNewLibrary() async throws {
         let original = RdcLibrarySnapshot(
-            sourceID: "stale-library-original", sourceName: "temp2.rdg",
+            sourceID: "stale-library-original", sourceName: "example.rdg",
             document: testDocument()
         )
         let replacement = RdcLibrarySnapshot(
@@ -718,7 +718,7 @@ final class RdcAppWorkflowTests: XCTestCase {
 
     func testGroupDescendantAddedAfterConfirmationRequiresFreshConfirmation() async throws {
         let original = RdcLibrarySnapshot(
-            sourceID: "stale-group", sourceName: "temp2.rdg", document: nestedDocument()
+            sourceID: "stale-group", sourceName: "example.rdg", document: nestedDocument()
         )
         let groupID = try XCTUnwrap(original.root.groups.first?.id)
         let changed = try ResourceLibraryEditor.createChildGroup(
@@ -748,7 +748,7 @@ final class RdcAppWorkflowTests: XCTestCase {
 
     func testServerChangedAfterConfirmationRequiresFreshConfirmation() async throws {
         let original = RdcLibrarySnapshot(
-            sourceID: "stale-server", sourceName: "temp2.rdg", document: testDocument()
+            sourceID: "stale-server", sourceName: "example.rdg", document: testDocument()
         )
         let serverID = try XCTUnwrap(original.root.servers.first?.id)
         let changed = try ResourceLibraryEditor.updateServer(
@@ -779,7 +779,7 @@ final class RdcAppWorkflowTests: XCTestCase {
 
     func testSupersededDurableEditReconcilesModelAndPersistedConfiguration() async throws {
         let snapshot = RdcLibrarySnapshot(
-            sourceID: "superseded-edit", sourceName: "temp2.rdg", document: twoServerDocument()
+            sourceID: "superseded-edit", sourceName: "example.rdg", document: twoServerDocument()
         )
         let store = AppControlledConfigurationStore(
             configuration: RdcAppConfiguration(lastLibrary: snapshot), suspendedSaveNumber: 1
@@ -818,7 +818,7 @@ final class RdcAppWorkflowTests: XCTestCase {
 
     func testSupersededDeleteRollbackFailureSurfacesPasswordStoreFailure() async throws {
         let snapshot = RdcLibrarySnapshot(
-            sourceID: "superseded-rollback", sourceName: "temp2.rdg", document: twoServerDocument()
+            sourceID: "superseded-rollback", sourceName: "example.rdg", document: twoServerDocument()
         )
         let firstID = try XCTUnwrap(snapshot.root.servers.first?.id)
         let secondID = try XCTUnwrap(snapshot.root.servers.last?.id)
@@ -1158,7 +1158,7 @@ final class RdcAppWorkflowTests: XCTestCase {
 
     func testDeletingPreviouslyActiveServerDuringSelectionRaceDisconnectsBeforeSave() async throws {
         let snapshot = RdcLibrarySnapshot(
-            sourceID: "active-selection-race", sourceName: "temp2.rdg", document: twoServerDocument()
+            sourceID: "active-selection-race", sourceName: "example.rdg", document: twoServerDocument()
         )
         let credentialID = "race-global-credential"
         let store = AppControlledConfigurationStore(
@@ -1221,7 +1221,7 @@ final class RdcAppWorkflowTests: XCTestCase {
     func testResourceAPINeverThrowsRawStoreErrorDetails() async throws {
         let sentinel = "sensitive-path-/Users/private/config.json"
         let snapshot = RdcLibrarySnapshot(
-            sourceID: "safe-error", sourceName: "temp2.rdg", document: testDocument()
+            sourceID: "safe-error", sourceName: "example.rdg", document: testDocument()
         )
         let store = AppDetailedFailingConfigurationStore(
             configuration: RdcAppConfiguration(lastLibrary: snapshot), detail: sentinel
@@ -1249,7 +1249,7 @@ final class RdcAppWorkflowTests: XCTestCase {
 
     func testRemoveWholeLibraryDirectlyCleansRootAndDescendantBindings() async throws {
         let snapshot = RdcLibrarySnapshot(
-            sourceID: "direct-remove", sourceName: "temp2.rdg", document: nestedDocument()
+            sourceID: "direct-remove", sourceName: "example.rdg", document: nestedDocument()
         )
         let rootID = try XCTUnwrap(snapshot.root.id)
         let groupID = try XCTUnwrap(snapshot.root.groups.first?.id)
@@ -1280,7 +1280,7 @@ final class RdcAppWorkflowTests: XCTestCase {
 
     func testResourceEditPreservesConcurrentPreferencesAndCertificatePin() async throws {
         let snapshot = RdcLibrarySnapshot(
-            sourceID: "concurrent-edit", sourceName: "temp2.rdg", document: testDocument()
+            sourceID: "concurrent-edit", sourceName: "example.rdg", document: testDocument()
         )
         let store = AppMemoryConfigurationStore(
             configuration: RdcAppConfiguration(lastLibrary: snapshot)
@@ -1335,7 +1335,7 @@ final class RdcAppWorkflowTests: XCTestCase {
 
     func testDeleteDoesNotRemoveCredentialThatGainsConcurrentReference() async throws {
         let snapshot = RdcLibrarySnapshot(
-            sourceID: "concurrent-reference", sourceName: "temp2.rdg", document: twoServerDocument()
+            sourceID: "concurrent-reference", sourceName: "example.rdg", document: twoServerDocument()
         )
         let firstID = try XCTUnwrap(snapshot.root.servers.first?.id)
         let secondID = try XCTUnwrap(snapshot.root.servers.last?.id)
@@ -1377,7 +1377,7 @@ final class RdcAppWorkflowTests: XCTestCase {
     func testEditedSnapshotSidebarKeepsPersistedSelectionAndCredentialScope() async throws {
         var snapshot = RdcLibrarySnapshot(
             sourceID: "editable-sidebar-source",
-            sourceName: "temp2.rdg",
+            sourceName: "example.rdg",
             document: nestedDocument()
         )
         let groupID = try XCTUnwrap(snapshot.root.groups.first?.id)
@@ -1469,7 +1469,7 @@ final class RdcAppWorkflowTests: XCTestCase {
     func testNoBindingPromptsForOneTimeCredentialWithoutStartingConnection() async {
         let snapshot = RdcLibrarySnapshot(
             sourceID: "source-no-binding",
-            sourceName: "temp2.rdg",
+            sourceName: "example.rdg",
             document: testDocument()
         )
         let engine = AppRecordingSessionEngine()
@@ -1492,7 +1492,7 @@ final class RdcAppWorkflowTests: XCTestCase {
     func testMissingKeychainItemPromptsWithSafeActionableWarning() async {
         let snapshot = RdcLibrarySnapshot(
             sourceID: "source-missing-keychain",
-            sourceName: "temp2.rdg",
+            sourceName: "example.rdg",
             document: testDocument()
         )
         let credentialID = "missing-keychain-item"
@@ -1524,7 +1524,7 @@ final class RdcAppWorkflowTests: XCTestCase {
     func testServerAndNearestGroupBindingsOverrideInheritedScopes() async throws {
         let snapshot = RdcLibrarySnapshot(
             sourceID: "source-precedence",
-            sourceName: "temp2.rdg",
+            sourceName: "example.rdg",
             document: nestedDocument()
         )
         let library = RdcImportedLibrary(
@@ -1579,7 +1579,7 @@ final class RdcAppWorkflowTests: XCTestCase {
 
     func testImportReusesStableSourceAndPersistsSanitizedSnapshotPreservingBindings() async throws {
         let sourceID = "source-import-stable"
-        let sourceName = "temp2.rdg"
+        let sourceName = "example.rdg"
         let originalDocument = testDocument()
         let originalSnapshot = RdcLibrarySnapshot(
             sourceID: sourceID,
@@ -1619,9 +1619,9 @@ final class RdcAppWorkflowTests: XCTestCase {
         let original = reimportWorkflowDocument(includeNewServer: false)
         var snapshot = RdcLibrarySnapshot(
             sourceID: sourceID,
-            sourceName: "temp2.rdg",
+            sourceName: "example.rdg",
             sourceLocatorFingerprint: StableLibraryID.sourceLocatorFingerprint(
-                for: "file:///Imported/temp2.rdg"
+                for: "file:///Imported/example.rdg"
             ),
             document: original
         )
@@ -1657,8 +1657,8 @@ final class RdcAppWorkflowTests: XCTestCase {
 
         await model.importLibrary(
             document: reimportWorkflowDocument(includeNewServer: true),
-            sourceName: "temp2.rdg",
-            sourceIdentity: "file:///Imported/temp2.rdg"
+            sourceName: "example.rdg",
+            sourceIdentity: "file:///Imported/example.rdg"
         )
 
         let reimported = try XCTUnwrap(model.library)
@@ -1684,7 +1684,7 @@ final class RdcAppWorkflowTests: XCTestCase {
     func testReimportRestoresDeletedItemsOnlyWhenExplicitlyRequested() async throws {
         let original = RdcLibrarySnapshot(
             sourceID: "source-restore-reimport",
-            sourceName: "temp2.rdg",
+            sourceName: "example.rdg",
             document: reimportWorkflowDocument(includeNewServer: false)
         )
         let deletedID = try XCTUnwrap(original.root.groups[0].servers[1].id)
@@ -1697,7 +1697,7 @@ final class RdcAppWorkflowTests: XCTestCase {
 
         await model.importLibrary(
             document: reimportWorkflowDocument(includeNewServer: false),
-            sourceName: "temp2.rdg"
+            sourceName: "example.rdg"
         )
         XCTAssertFalse(model.library?.servers.contains { $0.id == deletedID } ?? true)
         XCTAssertEqual(model.deletedImportRestoreCount, 1)
@@ -1711,7 +1711,7 @@ final class RdcAppWorkflowTests: XCTestCase {
 
     func testRestoreOfferCannotOverwriteLibraryEditedAfterOfferWasCommitted() async throws {
         let original = RdcLibrarySnapshot(
-            sourceID: "stale-restore-source", sourceName: "temp2.rdg",
+            sourceID: "stale-restore-source", sourceName: "example.rdg",
             document: reimportWorkflowDocument(includeNewServer: false)
         )
         let keptID = try XCTUnwrap(original.root.groups[0].servers[0].id)
@@ -1724,7 +1724,7 @@ final class RdcAppWorkflowTests: XCTestCase {
         try await model.deleteServer(id: deletedID)
         await model.importLibrary(
             document: reimportWorkflowDocument(includeNewServer: false),
-            sourceName: "temp2.rdg"
+            sourceName: "example.rdg"
         )
         XCTAssertEqual(model.deletedImportRestoreCount, 1)
         try await model.updateServer(
@@ -1746,7 +1746,7 @@ final class RdcAppWorkflowTests: XCTestCase {
 
     func testNewReimportReplacesRestoreOfferWithExactLatestDocument() async throws {
         let original = RdcLibrarySnapshot(
-            sourceID: "latest-offer-source", sourceName: "temp2.rdg",
+            sourceID: "latest-offer-source", sourceName: "example.rdg",
             sourceLocatorFingerprint: StableLibraryID.sourceLocatorFingerprint(
                 for: "file-id:latest-offer"
             ),
@@ -1761,12 +1761,12 @@ final class RdcAppWorkflowTests: XCTestCase {
         try await model.deleteServer(id: deletedID)
         await model.importLibrary(
             document: reimportWorkflowDocument(includeNewServer: false),
-            sourceName: "temp2.rdg",
+            sourceName: "example.rdg",
             sourceIdentity: "file-id:latest-offer"
         )
         await model.importLibrary(
             document: reimportWorkflowDocument(includeNewServer: true),
-            sourceName: "temp2.rdg",
+            sourceName: "example.rdg",
             sourceIdentity: "file-id:latest-offer"
         )
 
@@ -1779,9 +1779,9 @@ final class RdcAppWorkflowTests: XCTestCase {
 
     func testImportFromDifferentSourceReplacesInsteadOfMergingLocalResources() async throws {
         let original = RdcLibrarySnapshot(
-            sourceID: "source-a", sourceName: "temp2.rdg",
+            sourceID: "source-a", sourceName: "example.rdg",
             sourceLocatorFingerprint: StableLibraryID.sourceLocatorFingerprint(
-                for: "file:///Library-A/temp2.rdg"
+                for: "file:///Library-A/example.rdg"
             ),
             document: reimportWorkflowDocument(includeNewServer: false)
         )
@@ -1795,12 +1795,12 @@ final class RdcAppWorkflowTests: XCTestCase {
 
         await model.importLibrary(
             document: testDocument(),
-            sourceName: "temp2.rdg",
-            sourceIdentity: "file:///Library-B/temp2.rdg"
+            sourceName: "example.rdg",
+            sourceIdentity: "file:///Library-B/example.rdg"
         )
 
         XCTAssertNotEqual(model.library?.sourceID, original.sourceID)
-        XCTAssertEqual(model.library?.sourceName, "temp2.rdg")
+        XCTAssertEqual(model.library?.sourceName, "example.rdg")
         XCTAssertFalse(model.library?.groups.contains { $0.name == "Mac 专用" } ?? true)
         XCTAssertEqual(model.library?.servers.map(\.displayName), ["Server"])
         await model.shutdownAndWait()
@@ -1808,7 +1808,7 @@ final class RdcAppWorkflowTests: XCTestCase {
 
     func testLegacySameNameWithoutIdentityDoesNotMergeDifferentContentWithSameRoot() async throws {
         let original = RdcLibrarySnapshot(
-            sourceID: "legacy-source", sourceName: "temp2.rdg",
+            sourceID: "legacy-source", sourceName: "example.rdg",
             document: reimportWorkflowDocument(includeNewServer: false)
         )
         let rootID = try XCTUnwrap(original.root.id)
@@ -1819,7 +1819,7 @@ final class RdcAppWorkflowTests: XCTestCase {
         await model.loadPersistedState()
         try await model.createChildGroup(parentID: rootID, name: "Local Only")
 
-        await model.importLibrary(document: testDocument(), sourceName: "temp2.rdg")
+        await model.importLibrary(document: testDocument(), sourceName: "example.rdg")
 
         XCTAssertNotEqual(model.library?.sourceID, original.sourceID)
         XCTAssertFalse(model.library?.groups.contains { $0.name == "Local Only" } ?? true)
@@ -1829,7 +1829,7 @@ final class RdcAppWorkflowTests: XCTestCase {
 
     func testPersistedIdentityNeverFallsBackToSameNameWhenIncomingIdentityIsMissing() async {
         let original = RdcLibrarySnapshot(
-            sourceID: "identified-source", sourceName: "temp2.rdg",
+            sourceID: "identified-source", sourceName: "example.rdg",
             sourceLocatorFingerprint: StableLibraryID.sourceLocatorFingerprint(for: "file-id:a"),
             document: testDocument()
         )
@@ -1839,7 +1839,7 @@ final class RdcAppWorkflowTests: XCTestCase {
         )
         await model.loadPersistedState()
 
-        await model.importLibrary(document: testDocument(), sourceName: "temp2.rdg")
+        await model.importLibrary(document: testDocument(), sourceName: "example.rdg")
 
         XCTAssertNotEqual(model.library?.sourceID, original.sourceID)
         XCTAssertNil(model.configuration.lastLibrary?.sourceLocatorFingerprint)
@@ -1851,7 +1851,7 @@ final class RdcAppWorkflowTests: XCTestCase {
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
-        let original = directory.appendingPathComponent("temp2.rdg")
+        let original = directory.appendingPathComponent("example.rdg")
         try Data("fixture".utf8).write(to: original)
         let originalIdentity = RdcAppModel.sourceIdentity(for: original)
 
@@ -1870,7 +1870,7 @@ final class RdcAppWorkflowTests: XCTestCase {
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
-        let original = directory.appendingPathComponent("temp2.rdg")
+        let original = directory.appendingPathComponent("example.rdg")
         try Data("one".utf8).write(to: original)
         let originalAliases = RdcAppModel.sourceLocatorAliases(for: original)
 
@@ -1887,7 +1887,7 @@ final class RdcAppWorkflowTests: XCTestCase {
 
         let otherDirectory = directory.appendingPathComponent("other", isDirectory: true)
         try FileManager.default.createDirectory(at: otherDirectory, withIntermediateDirectories: true)
-        let sameNameElsewhere = otherDirectory.appendingPathComponent("temp2.rdg")
+        let sameNameElsewhere = otherDirectory.appendingPathComponent("example.rdg")
         try Data("other".utf8).write(to: sameNameElsewhere)
         XCTAssertTrue(originalAliases.isDisjoint(
             with: RdcAppModel.sourceLocatorAliases(for: sameNameElsewhere)
@@ -1896,7 +1896,7 @@ final class RdcAppWorkflowTests: XCTestCase {
 
     func testFingerprintOnlyLegacySourceMismatchStopsBeforeDestructiveReplacement() async throws {
         let snapshot = RdcLibrarySnapshot(
-            sourceID: "legacy-fingerprint-only", sourceName: "temp2.rdg",
+            sourceID: "legacy-fingerprint-only", sourceName: "example.rdg",
             sourceLocatorFingerprint: StableLibraryID.sourceLocatorFingerprint(for: "file-id:old"),
             document: testDocument()
         )
@@ -1906,7 +1906,7 @@ final class RdcAppWorkflowTests: XCTestCase {
         await model.loadPersistedState()
 
         await model.importLibrary(
-            document: nestedDocument(), sourceName: "temp2.rdg",
+            document: nestedDocument(), sourceName: "example.rdg",
             sourceIdentity: "file-id:replacement",
             sourceLocatorAliases: ["path-hash:same-path-but-not-previously-persisted"]
         )
@@ -2025,7 +2025,7 @@ final class RdcAppWorkflowTests: XCTestCase {
     func testSameSourceUpstreamRemovalCleansBindingAgainstFinalMergedIDs() async throws {
         let identity = "file-id:upstream-removal"
         let original = RdcLibrarySnapshot(
-            sourceID: "upstream-removal-source", sourceName: "temp2.rdg",
+            sourceID: "upstream-removal-source", sourceName: "example.rdg",
             sourceLocatorFingerprint: StableLibraryID.sourceLocatorFingerprint(for: identity),
             document: reimportWorkflowDocument(includeNewServer: false)
         )
@@ -2047,7 +2047,7 @@ final class RdcAppWorkflowTests: XCTestCase {
         await model.loadPersistedState()
 
         await model.importLibrary(
-            document: testDocument(), sourceName: "temp2.rdg", sourceIdentity: identity
+            document: testDocument(), sourceName: "example.rdg", sourceIdentity: identity
         )
 
         let persisted = await store.current()
@@ -2136,7 +2136,7 @@ final class RdcAppWorkflowTests: XCTestCase {
 
     func testReimportCommitsAgainstLatestConfigurationWithoutOverwritingConcurrentDelta() async throws {
         let original = RdcLibrarySnapshot(
-            sourceID: "source-concurrent-import", sourceName: "temp2.rdg",
+            sourceID: "source-concurrent-import", sourceName: "example.rdg",
             document: reimportWorkflowDocument(includeNewServer: false)
         )
         let store = AppMemoryConfigurationStore(
@@ -2155,7 +2155,7 @@ final class RdcAppWorkflowTests: XCTestCase {
         let importTask = Task { @MainActor in
             await model.importLibrary(
                 document: reimportWorkflowDocument(includeNewServer: true),
-                sourceName: "temp2.rdg"
+                sourceName: "example.rdg"
             )
         }
         await checkpoint.waitUntilPaused()
@@ -2181,7 +2181,7 @@ final class RdcAppWorkflowTests: XCTestCase {
 
     func testCommittedImportReconcilesModelAfterSupersedingSelection() async throws {
         let original = RdcLibrarySnapshot(
-            sourceID: "durable-import-source", sourceName: "temp2.rdg",
+            sourceID: "durable-import-source", sourceName: "example.rdg",
             sourceLocatorFingerprint: StableLibraryID.sourceLocatorFingerprint(
                 for: "file-id:durable-import-source"
             ),
@@ -2203,7 +2203,7 @@ final class RdcAppWorkflowTests: XCTestCase {
         let importTask = Task { @MainActor in
             await model.importLibrary(
                 document: reimportWorkflowDocument(includeNewServer: true),
-                sourceName: "temp2.rdg",
+                sourceName: "example.rdg",
                 sourceIdentity: "file-id:durable-import-source"
             )
         }
@@ -2268,7 +2268,7 @@ final class RdcAppWorkflowTests: XCTestCase {
 
     func testCommittedTombstoneImportPublishesRestoreOfferAfterSelectionSupersedes() async throws {
         let original = RdcLibrarySnapshot(
-            sourceID: "durable-offer-source", sourceName: "temp2.rdg",
+            sourceID: "durable-offer-source", sourceName: "example.rdg",
             sourceLocatorFingerprint: StableLibraryID.sourceLocatorFingerprint(
                 for: "file-id:durable-offer-source"
             ),
@@ -2291,7 +2291,7 @@ final class RdcAppWorkflowTests: XCTestCase {
         let importTask = Task { @MainActor in
             await model.importLibrary(
                 document: reimportWorkflowDocument(includeNewServer: false),
-                sourceName: "temp2.rdg",
+                sourceName: "example.rdg",
                 sourceIdentity: "file-id:durable-offer-source"
             )
         }
@@ -2315,7 +2315,7 @@ final class RdcAppWorkflowTests: XCTestCase {
     func testCredentialScopesPersistBindingsAndRestoreInheritanceRemovesOnlyBinding() async throws {
         let snapshot = RdcLibrarySnapshot(
             sourceID: "source-editor",
-            sourceName: "temp2.rdg",
+            sourceName: "example.rdg",
             document: nestedDocument()
         )
         let library = RdcImportedLibrary(
@@ -2380,7 +2380,7 @@ final class RdcAppWorkflowTests: XCTestCase {
     func testNewPersistentCredentialRollsBackPasswordMetadataAndBindingWhenBindingSaveFails() async throws {
         let snapshot = RdcLibrarySnapshot(
             sourceID: "source-new-rollback",
-            sourceName: "temp2.rdg",
+            sourceName: "example.rdg",
             document: testDocument()
         )
         let initial = RdcAppConfiguration(lastLibrary: snapshot)
@@ -2419,7 +2419,7 @@ final class RdcAppWorkflowTests: XCTestCase {
     func testExistingPersistentCredentialRollsBackPriorMaterialWhenBindingSaveFails() async throws {
         let snapshot = RdcLibrarySnapshot(
             sourceID: "source-existing-rollback",
-            sourceName: "temp2.rdg",
+            sourceName: "example.rdg",
             document: testDocument()
         )
         let credentialID = "existing-credential"
@@ -2664,7 +2664,7 @@ final class RdcAppWorkflowTests: XCTestCase {
     func testOneTimeCredentialConnectsWithoutWritingConfigurationOrPasswordStore() async throws {
         let snapshot = RdcLibrarySnapshot(
             sourceID: "source-one-time",
-            sourceName: "temp2.rdg",
+            sourceName: "example.rdg",
             document: testDocument()
         )
         let initial = RdcAppConfiguration(lastLibrary: snapshot)
@@ -2701,7 +2701,7 @@ final class RdcAppWorkflowTests: XCTestCase {
     func testOneTimeAuthenticationFailureRemainsActionableAndRetryClosesSheet() async throws {
         let snapshot = RdcLibrarySnapshot(
             sourceID: "source-one-time-retry",
-            sourceName: "temp2.rdg",
+            sourceName: "example.rdg",
             document: testDocument()
         )
         let engine = AppRetrySessionEngine(
@@ -2761,7 +2761,7 @@ final class RdcAppWorkflowTests: XCTestCase {
         for (failure, expectedPresentation) in cases {
             let snapshot = RdcLibrarySnapshot(
                 sourceID: UUID().uuidString,
-                sourceName: "temp2.rdg",
+                sourceName: "example.rdg",
                 document: testDocument()
             )
             let model = makeModel(
@@ -2795,7 +2795,7 @@ final class RdcAppWorkflowTests: XCTestCase {
     func testSelectedServerRetriesOneTransientTransportFailure() async throws {
         let snapshot = RdcLibrarySnapshot(
             sourceID: "source-transport-retry",
-            sourceName: "temp2.rdg",
+            sourceName: "example.rdg",
             document: testDocument()
         )
         let credentialID = "transport-retry-credential"
@@ -2833,7 +2833,7 @@ final class RdcAppWorkflowTests: XCTestCase {
 
     func testTransientTransportRetryWaitsExactlyOnceAndKeepsAttemptSemantics() async throws {
         let snapshot = RdcLibrarySnapshot(
-            sourceID: "source-controlled-retry", sourceName: "temp2.rdg",
+            sourceID: "source-controlled-retry", sourceName: "example.rdg",
             document: testDocument()
         )
         let credentialID = "controlled-retry-credential"
@@ -2880,7 +2880,7 @@ final class RdcAppWorkflowTests: XCTestCase {
     func testCredentialEditorPreventsRestoreInheritanceWhileSaveIsInFlight() async throws {
         let snapshot = RdcLibrarySnapshot(
             sourceID: "source-editor-mutual-exclusion",
-            sourceName: "temp2.rdg",
+            sourceName: "example.rdg",
             document: testDocument()
         )
         let store = AppMemoryConfigurationStore(
@@ -2925,7 +2925,7 @@ final class RdcAppWorkflowTests: XCTestCase {
     func testRapidSelectionCancelsInFlightConnectAndIgnoresLateLifecycle() async throws {
         let snapshot = RdcLibrarySnapshot(
             sourceID: "source-rapid-selection",
-            sourceName: "temp2.rdg",
+            sourceName: "example.rdg",
             document: twoServerDocument()
         )
         let credentialID = "rapid-selection-credential"
@@ -2966,7 +2966,7 @@ final class RdcAppWorkflowTests: XCTestCase {
     func testAuthenticationFailureOffersEveryCredentialEditingScopeWithoutRawErrorData() async throws {
         let snapshot = RdcLibrarySnapshot(
             sourceID: "source-auth-error",
-            sourceName: "temp2.rdg",
+            sourceName: "example.rdg",
             document: nestedDocument()
         )
         let library = RdcImportedLibrary(
@@ -3029,7 +3029,7 @@ final class RdcAppWorkflowTests: XCTestCase {
     func testTLSFailureSurfacesSpecificSafeMessageAndDiagnosticCode() async {
         let snapshot = RdcLibrarySnapshot(
             sourceID: "source-tls-error",
-            sourceName: "temp2.rdg",
+            sourceName: "example.rdg",
             document: testDocument()
         )
         let credentialID = "tls-credential"
@@ -3188,7 +3188,7 @@ final class RdcAppWorkflowTests: XCTestCase {
     func testProductionSessionWiringRejectsCertificateAfterInjectedSixtySecondClock() async throws {
         let snapshot = RdcLibrarySnapshot(
             sourceID: "source-certificate-wiring",
-            sourceName: "temp2.rdg",
+            sourceName: "example.rdg",
             document: testDocument()
         )
         let credentialID = "certificate-wiring-credential"
@@ -3247,7 +3247,7 @@ final class RdcAppWorkflowTests: XCTestCase {
     private func assertPersistentSaveCancellationRollsBack(shutdown: Bool) async throws {
         let snapshot = RdcLibrarySnapshot(
             sourceID: shutdown ? "source-shutdown-cancel" : "source-selection-cancel",
-            sourceName: "temp2.rdg",
+            sourceName: "example.rdg",
             document: twoServerDocument()
         )
         let initial = RdcAppConfiguration(lastLibrary: snapshot)

@@ -23,13 +23,13 @@
         </properties>
         <server>
           <properties>
-            <displayName>Windows Server A</displayName>
+            <displayName>Example Server A</displayName>
             <name>rdp.example.test:6166</name>
           </properties>
         </server>
         <server>
           <properties>
-            <displayName>Windows Server B</displayName>
+            <displayName>Example Server B</displayName>
             <name>198.51.100.57</name>
           </properties>
         </server>

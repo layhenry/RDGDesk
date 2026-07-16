@@ -1,12 +1,12 @@
-# Rdc
+# RDGDesk
 
-Rdc is a native macOS remote desktop client for importing RDCMan `.rdg` libraries and connecting through embedded FreeRDP.
+RDGDesk is an independent native macOS remote desktop client compatible with `.rdg` libraries exported by Microsoft Remote Desktop Connection Manager (RDCMan). Remote sessions are powered by embedded FreeRDP.
 
 > Current target: Apple silicon Macs running macOS 26 or later. The project is under active development; review the security model and test with non-production systems before relying on it for critical access.
 
 ## Current capabilities
 
-- Import, search, restore, and browse sanitized RDCMan libraries.
+- Import, search, restore, and browse sanitized RDCMan-compatible libraries.
 - Connect in the native canvas and forward pointer, wheel, scan-code keyboard, Chinese IME/Unicode, focus, full-screen, and resize events.
 - Send `Ctrl+Alt+Del`, explicitly send the local text clipboard, and receive remote text clipboard updates. Clipboard transfer is text-only and limited to 1 MB; local text is never sent automatically.
 - Save global, group, and server credentials. Passwords are generic-password items in macOS Keychain; the JSON configuration stores only non-sensitive metadata and bindings.
@@ -31,7 +31,7 @@ From this directory:
 ./scripts/run.sh
 ```
 
-Import an `.rdg` file from the sidebar, select a server, and click `连接`. Open `Rdc > 设置…` or use the sidebar gear for:
+Import an `.rdg` file from the sidebar, select a server, and click `连接`. Open `RDGDesk > 设置…` or use the sidebar gear for:
 
 - `通用`: restore the last library, double-click connection, and follow-window resize.
 - `全局凭据`: save, update, or remove the inherited Keychain credential.
@@ -47,7 +47,7 @@ The debug-only `使用外部客户端调试` action creates a temporary `.rdp` f
 RDC_SWIFTPM_DISABLE_SANDBOX=1 ./scripts/package-app.sh --dmg
 ```
 
-This creates `dist/Rdc.app` and `dist/Rdc.dmg`, bundles the FreeRDP/OpenSSL runtime libraries, and applies an ad-hoc signature. It is intended for the owner's Macs. Because it is not Developer ID signed or notarized, macOS may require Control-clicking the app and choosing `打开` on first launch. Public distribution requires a paid Apple Developer identity, hardened-runtime signing, and notarization.
+This creates `dist/RDGDesk.app` and `dist/RDGDesk.dmg`, bundles the FreeRDP/OpenSSL runtime libraries and their license texts, and applies an ad-hoc signature. It is intended for the owner's Macs. Because it is not Developer ID signed or notarized, macOS may require Control-clicking the app and choosing `打开` on first launch. Public distribution requires a paid Apple Developer identity, hardened-runtime signing, notarization, and a release-specific third-party dependency audit.
 
 ## Development and verification
 
@@ -84,6 +84,14 @@ No password should be placed in source files, fixtures, command output, issue re
 
 Please report vulnerabilities privately as described in [SECURITY.md](SECURITY.md). Do not include real credentials, `.rdg` files, certificate pins, server addresses, or connection logs in public issues.
 
+## Compatibility and trademarks
+
+RDGDesk is an independent project. It is not affiliated with, sponsored by, endorsed by, or distributed by Microsoft. Microsoft, Windows, Remote Desktop Connection Manager, RDCMan, and other Microsoft product names are used only in plain text to describe file-format and protocol compatibility; the corresponding names and trademarks belong to their respective owners.
+
+RDGDesk does not include Microsoft logos, Windows interface artwork, RDCMan binaries, or Microsoft source code.
+
+See [TRADEMARKS.md](TRADEMARKS.md) for the standalone trademark notice.
+
 ## License and third-party software
 
-Rdc source code is available under the [MIT License](LICENSE). It integrates with FreeRDP and OpenSSL; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for attribution and redistribution notes.
+RDGDesk source code is available under the [MIT License](LICENSE). It integrates with FreeRDP and OpenSSL; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for attribution and redistribution notes.

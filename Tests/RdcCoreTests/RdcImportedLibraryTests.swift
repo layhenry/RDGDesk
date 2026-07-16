@@ -6,7 +6,7 @@ final class RdcImportedLibraryTests: XCTestCase {
     func testImportedLibraryUsesPersistedIDsInsteadOfRecomputingFromEditedFields() throws {
         var snapshot = RdcLibrarySnapshot(
             sourceID: "source-editable",
-            sourceName: "temp2.rdg",
+            sourceName: "example.rdg",
             document: try fixtureDocument()
         ).normalizedStableIdentity()
         let originalID = try XCTUnwrap(snapshot.root.groups.first?.groups.first?.servers.first?.id)
@@ -21,12 +21,12 @@ final class RdcImportedLibraryTests: XCTestCase {
         let first = RdcImportedLibrary(
             document: document,
             sourceID: "source-1",
-            sourceName: "temp2.rdg"
+            sourceName: "example.rdg"
         )
         let second = RdcImportedLibrary(
             document: document,
             sourceID: "source-1",
-            sourceName: "temp2.rdg"
+            sourceName: "example.rdg"
         )
 
         XCTAssertEqual(first.sourceID, "source-1")
@@ -68,7 +68,7 @@ final class RdcImportedLibraryTests: XCTestCase {
         let library = RdcImportedLibrary(
             document: try fixtureDocument(),
             sourceID: "source-1",
-            sourceName: "temp2.rdg"
+            sourceName: "example.rdg"
         )
 
         XCTAssertEqual(library.groups.map(\.path), [
@@ -92,7 +92,7 @@ final class RdcImportedLibraryTests: XCTestCase {
         let library = RdcImportedLibrary(
             document: try fixtureDocument(),
             sourceID: "source-1",
-            sourceName: "temp2.rdg"
+            sourceName: "example.rdg"
         )
         let server = try XCTUnwrap(library.servers.last)
 
@@ -100,7 +100,7 @@ final class RdcImportedLibraryTests: XCTestCase {
             server.id,
             StableLibraryID.server(
                 sourceID: "source-1",
-                path: ["示例资源库", "生产环境", "业务服务器", "Windows Server B"],
+                path: ["示例资源库", "生产环境", "业务服务器", "Example Server B"],
                 host: "198.51.100.57",
                 port: 3_389
             )
@@ -109,8 +109,8 @@ final class RdcImportedLibraryTests: XCTestCase {
 
     func testCompatibilityInitializerDerivesDeterministicSourceIdentity() throws {
         let document = try fixtureDocument()
-        let first = RdcImportedLibrary(document: document, sourceName: "temp2.rdg")
-        let second = RdcImportedLibrary(document: document, sourceName: "temp2.rdg")
+        let first = RdcImportedLibrary(document: document, sourceName: "example.rdg")
+        let second = RdcImportedLibrary(document: document, sourceName: "example.rdg")
 
         XCTAssertEqual(first.sourceID, second.sourceID)
         XCTAssertEqual(first.servers.map(\.id), second.servers.map(\.id))

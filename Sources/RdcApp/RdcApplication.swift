@@ -667,7 +667,7 @@ private struct ResourceLibrarySidebarView: View {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .stroke(Color.black.opacity(0.08), lineWidth: 1)
             }
-            .help("导入 RDCMan .rdg 文件")
+            .help("导入兼容 RDCMan 的 .rdg 文件")
         }
     }
 
@@ -787,7 +787,7 @@ private struct SidebarEmptyView: View {
                 .foregroundStyle(.secondary)
             Text("导入 .rdg 文件")
                 .font(.system(size: 14, weight: .semibold))
-            Text("选择 Windows RDCMan 导出的文件")
+            Text("选择兼容 RDCMan 的 .rdg 文件")
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -974,7 +974,7 @@ private struct SessionWorkspaceView: View {
     private func sessionCanvas(for server: RdcImportedServer) -> some View {
         if model.session.isConnecting {
             ZStack {
-                WindowsWallpaperView()
+                RemotePlaceholderBackground()
                 ProgressView("正在建立嵌入式连接…")
                     .controlSize(.large)
                     .padding(22)
@@ -1030,7 +1030,7 @@ private struct EmptySessionCanvas: View {
                 .foregroundStyle(.secondary)
             Text("选择一个远程桌面")
                 .font(.system(size: 19, weight: .semibold))
-            Text("导入 RDCMan .rdg 文件后，左侧会显示服务器列表。")
+            Text("导入兼容 RDCMan 的 .rdg 文件后，左侧会显示服务器列表。")
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
             Button("导入 .rdg") {
@@ -1056,12 +1056,38 @@ private struct RemoteDesktopCanvas: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            WindowsWallpaperView()
-                .overlay(alignment: .topLeading) {
-                    desktopIcons
+            RemotePlaceholderBackground()
+
+            HStack(spacing: 14) {
+                Image(systemName: "display")
+                    .font(.system(size: 28, weight: .medium))
+                    .foregroundStyle(.blue)
+                    .frame(width: 48, height: 48)
+                    .background(.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(server.displayName)
+                        .font(.system(size: 15, weight: .semibold))
+                        .lineLimit(1)
+                    Text(server.address.rawValue)
+                        .font(.system(size: 12, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
 
-            WindowsTaskbarView()
+                Spacer(minLength: 20)
+
+                Label("双击连接", systemImage: "arrow.up.right.circle.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.blue)
+            }
+            .padding(16)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(.white.opacity(0.7), lineWidth: 1)
+            }
+            .padding(22)
         }
         .clipShape(RoundedRectangle(cornerRadius: CGFloat(style.cornerRadius), style: .continuous))
         .overlay {
@@ -1081,194 +1107,47 @@ private struct RemoteDesktopCanvas: View {
         .accessibilityLabel(accessibility.remoteScreenLabel)
     }
 
-    private var desktopIcons: some View {
-        VStack(alignment: .leading, spacing: 28) {
-            DesktopIcon(symbol: "trash", title: "回收站", tint: Color(red: 0.53, green: 0.72, blue: 0.88))
-            DesktopIcon(symbol: "folder.fill", title: "测试文件夹", tint: Color(red: 1.00, green: 0.78, blue: 0.24))
-            DesktopIcon(symbol: "display", title: server.displayName, tint: Color(red: 0.24, green: 0.46, blue: 0.80))
-        }
-        .padding(.top, 22)
-        .padding(.leading, 22)
-    }
 }
 
-private struct WindowsWallpaperView: View {
+private struct RemotePlaceholderBackground: View {
     var body: some View {
         GeometryReader { proxy in
             ZStack {
                 LinearGradient(
                     colors: [
-                        Color(red: 0.68, green: 0.78, blue: 0.86),
-                        Color(red: 0.86, green: 0.92, blue: 0.96),
-                        Color(red: 0.54, green: 0.68, blue: 0.80)
+                        Color(red: 0.91, green: 0.95, blue: 1.00),
+                        Color(red: 0.83, green: 0.89, blue: 0.98),
+                        Color(red: 0.91, green: 0.87, blue: 0.98)
                     ],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
 
-                ForEach(0..<9, id: \.self) { index in
-                    RibbonShape(variant: index)
-                        .stroke(
-                            LinearGradient(
-                                colors: [
-                                    Color(red: 0.04, green: 0.73, blue: 1.00).opacity(0.86),
-                                    Color(red: 0.01, green: 0.24, blue: 0.94).opacity(0.94),
-                                    Color(red: 0.03, green: 0.13, blue: 0.62).opacity(0.90)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            style: StrokeStyle(lineWidth: CGFloat(max(18, 58 - index * 4)), lineCap: .round)
-                        )
-                        .frame(
-                            width: proxy.size.width * 0.78,
-                            height: proxy.size.height * 0.82
-                        )
-                        .offset(
-                            x: proxy.size.width * CGFloat(0.22 + Double(index) * 0.012),
-                            y: proxy.size.height * CGFloat(0.04 + Double(index) * 0.015)
-                        )
-                        .blur(radius: CGFloat(index) * 0.15)
-                }
+                Circle()
+                    .fill(Color.blue.opacity(0.22))
+                    .frame(width: proxy.size.width * 0.62)
+                    .blur(radius: 3)
+                    .offset(x: proxy.size.width * 0.31, y: -proxy.size.height * 0.22)
+
+                Circle()
+                    .fill(Color.purple.opacity(0.18))
+                    .frame(width: proxy.size.width * 0.48)
+                    .blur(radius: 5)
+                    .offset(x: -proxy.size.width * 0.34, y: proxy.size.height * 0.28)
+
+                RoundedRectangle(cornerRadius: 72, style: .continuous)
+                    .stroke(Color.white.opacity(0.42), lineWidth: 34)
+                    .frame(width: proxy.size.width * 0.72, height: proxy.size.height * 0.42)
+                    .rotationEffect(.degrees(-14))
+                    .offset(x: proxy.size.width * 0.14, y: -proxy.size.height * 0.06)
 
                 LinearGradient(
-                    colors: [.white.opacity(0.10), .clear, .black.opacity(0.07)],
+                    colors: [.white.opacity(0.22), .clear, .blue.opacity(0.05)],
                     startPoint: .top,
                     endPoint: .bottom
                 )
             }
         }
-    }
-}
-
-private struct RibbonShape: Shape {
-    let variant: Int
-
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let inset = CGFloat(variant) * 7
-        path.move(to: CGPoint(x: rect.minX + rect.width * 0.08 + inset, y: rect.maxY - rect.height * 0.10 - inset))
-        path.addCurve(
-            to: CGPoint(x: rect.maxX - rect.width * 0.16, y: rect.minY + rect.height * 0.20 + inset),
-            control1: CGPoint(x: rect.minX + rect.width * 0.24, y: rect.minY + rect.height * 0.30 + inset),
-            control2: CGPoint(x: rect.maxX - rect.width * 0.36, y: rect.minY - rect.height * 0.10 + inset)
-        )
-        path.addCurve(
-            to: CGPoint(x: rect.maxX - rect.width * 0.08 - inset, y: rect.maxY - rect.height * 0.24),
-            control1: CGPoint(x: rect.maxX + rect.width * 0.08 - inset, y: rect.minY + rect.height * 0.42),
-            control2: CGPoint(x: rect.maxX - rect.width * 0.36 + inset, y: rect.maxY - rect.height * 0.06)
-        )
-        path.addCurve(
-            to: CGPoint(x: rect.minX + rect.width * 0.20, y: rect.maxY - rect.height * 0.18 - inset),
-            control1: CGPoint(x: rect.maxX - rect.width * 0.45, y: rect.maxY - rect.height * 0.46 + inset),
-            control2: CGPoint(x: rect.minX + rect.width * 0.42, y: rect.maxY + rect.height * 0.08 - inset)
-        )
-        return path
-    }
-}
-
-private struct DesktopIcon: View {
-    let symbol: String
-    let title: String
-    let tint: Color
-
-    var body: some View {
-        VStack(spacing: 6) {
-            Image(systemName: symbol)
-                .font(.system(size: 33, weight: .regular))
-                .foregroundStyle(tint)
-                .frame(width: 48, height: 42)
-                .shadow(color: .black.opacity(0.18), radius: 2, y: 1)
-            Text(title)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.white)
-                .shadow(color: .black.opacity(0.85), radius: 2, y: 1)
-                .lineLimit(2)
-                .multilineTextAlignment(.center)
-                .frame(width: 82)
-        }
-    }
-}
-
-private struct WindowsTaskbarView: View {
-    var body: some View {
-        HStack(spacing: 18) {
-            Spacer()
-
-            WindowsLogo()
-
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 17, weight: .semibold))
-                Text("搜索")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(.secondary)
-                Spacer()
-            }
-            .padding(.horizontal, 12)
-            .frame(width: 184, height: 35)
-            .background(.white.opacity(0.78), in: Capsule())
-
-            TaskbarIcon(symbol: "folder.fill", tint: Color(red: 0.98, green: 0.73, blue: 0.18))
-            TaskbarIcon(symbol: "globe", tint: Color(red: 0.10, green: 0.58, blue: 0.86))
-            TaskbarIcon(symbol: "square.grid.2x2.fill", tint: Color(red: 0.12, green: 0.42, blue: 0.86))
-
-            Spacer()
-
-            HStack(spacing: 11) {
-                Image(systemName: "chevron.up")
-                Image(systemName: "display")
-                Image(systemName: "wifi")
-                Image(systemName: "battery.100")
-                VStack(alignment: .trailing, spacing: 1) {
-                    Text("10:42")
-                    Text("2024/06/21")
-                }
-            }
-            .font(.system(size: 12, weight: .medium))
-            .foregroundStyle(Color(red: 0.15, green: 0.17, blue: 0.21))
-        }
-        .padding(.horizontal, 24)
-        .frame(height: 56)
-        .background(.ultraThinMaterial)
-    }
-}
-
-private struct TaskbarIcon: View {
-    let symbol: String
-    let tint: Color
-
-    var body: some View {
-        Image(systemName: symbol)
-            .font(.system(size: 22, weight: .semibold))
-            .foregroundStyle(tint)
-            .frame(width: 34, height: 34)
-    }
-}
-
-private struct WindowsLogo: View {
-    var body: some View {
-        Grid(horizontalSpacing: 2, verticalSpacing: 2) {
-            GridRow {
-                Rectangle()
-                Rectangle()
-            }
-            GridRow {
-                Rectangle()
-                Rectangle()
-            }
-        }
-        .foregroundStyle(
-            LinearGradient(
-                colors: [
-                    Color(red: 0.10, green: 0.64, blue: 1.00),
-                    Color(red: 0.02, green: 0.35, blue: 0.92)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
-        .frame(width: 25, height: 25)
     }
 }
 

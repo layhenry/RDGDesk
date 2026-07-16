@@ -1,6 +1,6 @@
 public enum AppBranding {
-    public static let productName = "Rdc"
-    public static let remoteDesktopSubtitle = "Remote Desktop Client"
+    public static let productName = "RDGDesk"
+    public static let remoteDesktopSubtitle = "Remote Desktop Library Client"
 }
 
 public enum WindowConfiguration {

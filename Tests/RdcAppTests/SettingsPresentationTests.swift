@@ -57,7 +57,7 @@ final class SettingsPresentationTests: XCTestCase {
                     )]
                 )], servers: []
             )),
-            sourceID: "destination-fixture", sourceName: "temp2.rdg"
+            sourceID: "destination-fixture", sourceName: "example.rdg"
         )
         let root = try XCTUnwrap(library.groups.first { $0.parentID == nil })
         let moving = try XCTUnwrap(library.groups.first { $0.parentID == root.id })
@@ -1465,7 +1465,7 @@ final class SettingsPresentationTests: XCTestCase {
         XCTAssertTrue(rows.allSatisfy { !$0.searchableText.isEmpty })
     }
 
-    func testRealTemp2ReadOnlyImportHasExpectedProductionScaleAndNoImportedSecret() throws {
+    func testPrivateLargeLibraryReadOnlyImportHasExpectedProductionScaleAndNoImportedSecret() throws {
         guard let path = ProcessInfo.processInfo.environment["RDC_TEST_RDG_PATH"],
               !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw XCTSkip("Set RDC_TEST_RDG_PATH to enable private large-library acceptance coverage")
@@ -1603,14 +1603,14 @@ final class SettingsPresentationTests: XCTestCase {
         return RdcImportedLibrary(
             document: RdcManDocument(programVersion: "2.7", schemaVersion: "3", root: root),
             sourceID: "settings-fixture",
-            sourceName: "temp2.rdg"
+            sourceName: "example.rdg"
         )
     }
 
     private func deletionSnapshotFixture() -> RdcLibrarySnapshot {
         RdcLibrarySnapshot(
             sourceID: "deletion-presentation-fixture",
-            sourceName: "temp2.rdg",
+            sourceName: "example.rdg",
             document: fixtureLibrary().document
         )
     }

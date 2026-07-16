@@ -17,11 +17,11 @@ final class RdcManParserTests: XCTestCase {
 
         XCTAssertEqual(group.name, "业务服务器")
         XCTAssertEqual(group.servers.count, 2)
-        XCTAssertEqual(group.servers[0].displayName, "Windows Server A")
+        XCTAssertEqual(group.servers[0].displayName, "Example Server A")
         XCTAssertEqual(group.servers[0].address.rawValue, "rdp.example.test:6166")
         XCTAssertEqual(group.servers[0].address.host, "rdp.example.test")
         XCTAssertEqual(group.servers[0].address.port, 6166)
-        XCTAssertEqual(group.servers[1].displayName, "Windows Server B")
+        XCTAssertEqual(group.servers[1].displayName, "Example Server B")
         XCTAssertEqual(group.servers[1].address.host, "198.51.100.57")
         XCTAssertNil(group.servers[1].address.port)
     }

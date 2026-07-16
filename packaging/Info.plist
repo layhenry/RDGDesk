@@ -5,15 +5,15 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>zh_CN</string>
     <key>CFBundleDisplayName</key>
-    <string>Rdc</string>
+    <string>RDGDesk</string>
     <key>CFBundleExecutable</key>
     <string>Rdc</string>
     <key>CFBundleIdentifier</key>
-    <string>com.rdc.local</string>
+    <string>io.github.layhenry.rdgdesk</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>Rdc</string>
+    <string>RDGDesk</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>

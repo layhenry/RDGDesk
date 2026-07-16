@@ -213,12 +213,12 @@ public enum ResourceLibrarySampleData {
                                 groups: [],
                                 servers: [
                                     RdcServer(
-                                        displayName: "Windows Server A",
+                                        displayName: "Example Server A",
                                         address: RdcServerAddress("rdp.example.test:6166"),
                                         logonCredentials: nil
                                     ),
                                     RdcServer(
-                                        displayName: "Windows Server B",
+                                        displayName: "Example Server B",
                                         address: RdcServerAddress("198.51.100.57"),
                                         logonCredentials: nil
                                     )
@@ -234,7 +234,7 @@ public enum ResourceLibrarySampleData {
                         groups: [],
                         servers: [
                             RdcServer(
-                                displayName: "Windows Server C",
+                                displayName: "Example Server C",
                                 address: RdcServerAddress("rdp.example.test:6021"),
                                 logonCredentials: nil
                             )

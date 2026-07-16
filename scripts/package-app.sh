@@ -12,6 +12,8 @@ elif [[ $# -ne 0 ]]; then
 fi
 
 prefix="$PWD/.build/vendor/freerdp-prefix"
+source_dir="$PWD/.build/vendor/src/FreeRDP"
+openssl_root="$(/opt/homebrew/bin/brew --prefix openssl@3)"
 if [[ ! -f "$prefix/lib/libfreerdp3.3.dylib" ]]; then
   echo "FreeRDP is missing; run ./scripts/bootstrap-freerdp.sh first." >&2
   exit 1
@@ -35,13 +37,23 @@ if [[ "${RDC_SWIFTPM_DISABLE_SANDBOX:-0}" == "1" ]]; then
 fi
 swift "${swift_arguments[@]}"
 
-app="$PWD/dist/Rdc.app"
+app="$PWD/dist/RDGDesk.app"
 frameworks="$app/Contents/Frameworks"
 macos="$app/Contents/MacOS"
+licenses="$app/Contents/Resources/Licenses"
 rm -rf "$app"
-mkdir -p "$frameworks" "$macos"
+mkdir -p "$frameworks" "$macos" "$licenses"
 cp packaging/Info.plist "$app/Contents/Info.plist"
 cp .build/release/Rdc "$macos/Rdc"
+test -f "$source_dir/LICENSE"
+test -f "$openssl_root/LICENSE.txt"
+cp LICENSE "$licenses/RDGDesk-MIT.txt"
+cp THIRD_PARTY_NOTICES.md "$licenses/THIRD_PARTY_NOTICES.md"
+cp TRADEMARKS.md "$licenses/TRADEMARKS.md"
+cp "$source_dir/LICENSE" "$licenses/FreeRDP-Apache-2.0.txt"
+cp "$openssl_root/LICENSE.txt" "$licenses/OpenSSL-Apache-2.0.txt"
+if [[ -f "$source_dir/NOTICE" ]]; then cp "$source_dir/NOTICE" "$licenses/FreeRDP-NOTICE.txt"; fi
+if [[ -f "$openssl_root/NOTICE" ]]; then cp "$openssl_root/NOTICE" "$licenses/OpenSSL-NOTICE.txt"; fi
 
 copy_dependency() {
   local dependency="$1"
@@ -107,9 +119,9 @@ codesign --force --deep --sign - "$app"
 codesign --verify --deep --strict "$app"
 
 if [[ $create_dmg -eq 1 ]]; then
-  rm -f "$PWD/dist/Rdc.dmg"
-  hdiutil create -volname Rdc -srcfolder "$app" -ov -format UDZO "$PWD/dist/Rdc.dmg"
+  rm -f "$PWD/dist/RDGDesk.dmg"
+  hdiutil create -volname RDGDesk -srcfolder "$app" -ov -format UDZO "$PWD/dist/RDGDesk.dmg"
 fi
 
 echo "$app"
-if [[ $create_dmg -eq 1 ]]; then echo "$PWD/dist/Rdc.dmg"; fi
+if [[ $create_dmg -eq 1 ]]; then echo "$PWD/dist/RDGDesk.dmg"; fi

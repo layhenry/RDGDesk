@@ -2,13 +2,13 @@ import XCTest
 @testable import RdcCore
 
 final class AppFoundationTests: XCTestCase {
-    func testBrandingUsesRdcProductName() {
-        XCTAssertEqual(AppBranding.productName, "Rdc")
-        XCTAssertEqual(AppBranding.remoteDesktopSubtitle, "Remote Desktop Client")
+    func testBrandingUsesIndependentProductName() {
+        XCTAssertEqual(AppBranding.productName, "RDGDesk")
+        XCTAssertEqual(AppBranding.remoteDesktopSubtitle, "Remote Desktop Library Client")
     }
 
-    func testPrimaryWindowTitleUsesRdc() {
-        XCTAssertEqual(WindowConfiguration.primaryTitle, "Rdc")
+    func testPrimaryWindowTitleUsesIndependentProductName() {
+        XCTAssertEqual(WindowConfiguration.primaryTitle, "RDGDesk")
         XCTAssertEqual(WindowConfiguration.minimumWidth, 1040)
         XCTAssertEqual(WindowConfiguration.minimumHeight, 680)
         XCTAssertEqual(WindowConfiguration.defaultWidth, 1280)

@@ -83,7 +83,7 @@ final class CredentialResolverTests: XCTestCase {
         let document = try fixtureDocument()
         let snapshot = RdcLibrarySnapshot(
             sourceID: "source-1",
-            sourceName: "temp2.rdg",
+            sourceName: "example.rdg",
             document: document
         )
         let initialLibrary = RdcImportedLibrary(

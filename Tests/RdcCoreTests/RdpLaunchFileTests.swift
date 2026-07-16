@@ -28,7 +28,7 @@ final class RdpLaunchFileTests: XCTestCase {
 
     func testLaunchFileDefaultsToPromptWhenCredentialMissing() {
         let request = RdpConnectionRequest(
-            serverID: "Windows Server B",
+            serverID: "Example Server B",
             host: "198.51.100.57",
             port: nil,
             username: nil,
@@ -37,7 +37,7 @@ final class RdpLaunchFileTests: XCTestCase {
 
         let file = RdpLaunchFile(request: request, credential: nil)
 
-        XCTAssertEqual(file.suggestedFilename, "Windows Server B.rdp")
+        XCTAssertEqual(file.suggestedFilename, "Example Server B.rdp")
         XCTAssertTrue(file.contents.contains("full address:s:198.51.100.57"))
         XCTAssertTrue(file.contents.contains("prompt for credentials:i:1"))
         XCTAssertFalse(file.contents.contains("username:s:"))

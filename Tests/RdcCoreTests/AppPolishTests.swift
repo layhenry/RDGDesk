@@ -5,9 +5,9 @@ final class AppPolishTests: XCTestCase {
     func testPolishKeepsRdcBrandConsistentAcrossCoreSurfaces() {
         let polish = RdcPolishProfile.default
 
-        XCTAssertEqual(polish.productName, "Rdc")
-        XCTAssertEqual(polish.resourceLibraryTitle, "Rdc 资源库")
-        XCTAssertEqual(polish.sessionCanvasTitle, "Rdc 远程桌面")
+        XCTAssertEqual(polish.productName, "RDGDesk")
+        XCTAssertEqual(polish.resourceLibraryTitle, "RDGDesk 资源库")
+        XCTAssertEqual(polish.sessionCanvasTitle, "RDGDesk 远程桌面")
     }
 
     func testEmptyLoadingAndErrorStatesHaveActionablePresentations() {
@@ -16,20 +16,20 @@ final class AppPolishTests: XCTestCase {
         let error = RdcInterfaceState.error("无法读取 .rdg 文件").presentation
 
         XCTAssertEqual(empty.title, "导入 .rdg 文件")
-        XCTAssertEqual(empty.accessibilityLabel, "Rdc 空资源库")
+        XCTAssertEqual(empty.accessibilityLabel, "RDGDesk 空资源库")
         XCTAssertEqual(loading.title, "正在读取资源库")
-        XCTAssertEqual(loading.accessibilityLabel, "Rdc 正在加载")
+        XCTAssertEqual(loading.accessibilityLabel, "RDGDesk 正在加载")
         XCTAssertEqual(error.title, "读取失败")
         XCTAssertEqual(error.message, "无法读取 .rdg 文件")
-        XCTAssertEqual(error.accessibilityLabel, "Rdc 错误状态")
+        XCTAssertEqual(error.accessibilityLabel, "RDGDesk 错误状态")
     }
 
     func testAccessibilityLabelsCoverPrimaryDirection2Regions() {
         let accessibility = RdcAccessibilityProfile.direction2
 
-        XCTAssertEqual(accessibility.resourceLibraryLabel, "Rdc 资源库")
+        XCTAssertEqual(accessibility.resourceLibraryLabel, "RDGDesk 资源库")
         XCTAssertEqual(accessibility.searchFieldLabel, "搜索服务器")
-        XCTAssertEqual(accessibility.sessionCanvasLabel, "Rdc 远程桌面画布")
+        XCTAssertEqual(accessibility.sessionCanvasLabel, "RDGDesk 远程桌面画布")
         XCTAssertEqual(accessibility.remoteScreenLabel, "远程桌面预览画面")
     }
 
