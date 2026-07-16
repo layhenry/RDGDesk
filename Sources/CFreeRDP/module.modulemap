@@ -1,0 +1,7 @@
+module CFreeRDP [system] {
+  header "shim.h"
+  link "freerdp3"
+  link "freerdp-client3"
+  link "winpr3"
+  export *
+}

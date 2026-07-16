@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RDCMan programVersion="2.92" schemaVersion="3">
+  <file>
+    <properties>
+      <expanded>True</expanded>
+      <name>示例资源库</name>
+    </properties>
+    <logonCredentials inherit="None">
+      <profileName scope="Local">自定义</profileName>
+      <userName>administrator</userName>
+      <password>AQAAANCMnd8BFdERjHoAwEExampleDpapiCipherText</password>
+      <domain>EXAMPLE</domain>
+    </logonCredentials>
+    <group>
+      <properties>
+        <expanded>True</expanded>
+        <name>生产环境</name>
+      </properties>
+      <group>
+        <properties>
+          <expanded>True</expanded>
+          <name>业务服务器</name>
+        </properties>
+        <server>
+          <properties>
+            <displayName>Windows Server A</displayName>
+            <name>rdp.example.test:6166</name>
+          </properties>
+        </server>
+        <server>
+          <properties>
+            <displayName>Windows Server B</displayName>
+            <name>198.51.100.57</name>
+          </properties>
+        </server>
+      </group>
+    </group>
+  </file>
+</RDCMan>

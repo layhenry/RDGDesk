@@ -1,0 +1,2 @@
+# Test-only localhost TLS fixture; see the explanation beside PRIVATE_KEY.
+Tests/RdcCoreTests/Fixtures/fake_rdp_tls_server.py:private-key:30

@@ -1,0 +1,12 @@
+.build/
+.build/vendor/
+.build/integration/
+.swiftpm/
+DerivedData/
+dist/
+.DS_Store
+*.rdg
+!Tests/RdcCoreTests/Fixtures/minimal-rdcman.rdg
+*.dmg
+*.p12
+*.mobileprovision
