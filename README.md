@@ -1,55 +1,65 @@
 # RDGDesk
 
-RDGDesk is an independent native macOS remote desktop client compatible with `.rdg` libraries exported by Microsoft Remote Desktop Connection Manager (RDCMan). Remote sessions are powered by embedded FreeRDP.
+**简体中文** | [English](README.en.md)
 
-> Current target: Apple silicon Macs running macOS 26 or later. The project is under active development; review the security model and test with non-production systems before relying on it for critical access.
+RDGDesk 是一款独立开发的原生 macOS 远程桌面客户端，兼容 Microsoft Remote Desktop Connection Manager（RDCMan）导出的 `.rdg` 资源库，并使用内置 FreeRDP 建立远程会话。
 
-## Current capabilities
+> 当前支持搭载 Apple 芯片、运行 macOS 26 或更高版本的 Mac。项目仍在积极开发中；用于关键系统前，请先阅读安全模型并在非生产环境中完成测试。
 
-- Import, search, restore, and browse sanitized RDCMan-compatible libraries.
-- Connect in the native canvas and forward pointer, wheel, scan-code keyboard, Chinese IME/Unicode, focus, full-screen, and resize events.
-- Send `Ctrl+Alt+Del`, explicitly send the local text clipboard, and receive remote text clipboard updates. Clipboard transfer is text-only and limited to 1 MB; local text is never sent automatically.
-- Save global, group, and server credentials. Passwords are generic-password items in macOS Keychain; the JSON configuration stores only non-sensitive metadata and bindings.
-- Resolve credentials in this order: server override, nearest group, parent groups, global credential, then a one-time prompt.
-- Require an explicit certificate decision on first use or when a fingerprint changes. `信任一次` applies only to the current attempt; `始终信任` saves the endpoint SHA-256 pin; `取消` rejects the connection. A matching saved pin reconnects without a sheet.
-- Classify DNS, timeout, refused connection, TLS/protocol, certificate, authentication, remote-disconnect, Keychain, and configuration failures separately.
+## 界面预览
 
-RDCMan passwords protected by Windows DPAPI are never decrypted on macOS and are removed from the restored local snapshot.
+![RDGDesk 资源库与远程桌面](docs/images/rdgdesk-main.png)
 
-## Running the app
+| 通用设置 | 证书管理 | 连接诊断 |
+| --- | --- | --- |
+| ![RDGDesk 通用设置](docs/images/rdgdesk-settings.png) | ![RDGDesk 证书管理](docs/images/rdgdesk-security.png) | ![RDGDesk 连接诊断](docs/images/rdgdesk-connection.png) |
 
-Install the build prerequisites first:
+## 现有功能
+
+- 导入、搜索、恢复和浏览经过脱敏处理、兼容 RDCMan 的资源库。
+- 在原生远程画布中连接服务器，并转发鼠标、滚轮、扫描码键盘、中文输入法/Unicode、焦点、全屏和窗口尺寸变化事件。
+- 发送 `Ctrl+Alt+Del`、手动发送本机文本剪贴板，并接收远程文本剪贴板更新。剪贴板仅支持文本，大小限制为 1 MB；本机文本绝不会自动发送。
+- 保存全局、分组和服务器级凭据。密码以通用密码项目保存在 macOS 钥匙串中；JSON 配置只保存非敏感元数据和绑定关系。
+- 按以下顺序解析凭据：服务器覆盖、最近分组、上级分组、全局凭据，最后是仅使用一次的输入提示。
+- 首次使用证书或证书指纹发生变化时，必须明确作出选择。`信任一次` 只对当前连接有效；`始终信任` 保存端点 SHA-256 指纹；`取消` 拒绝连接。已保存且匹配的指纹再次连接时不会弹出确认窗口。
+- 分别识别 DNS、超时、拒绝连接、TLS/协议、证书、身份验证、远程断开、钥匙串和配置错误。
+
+受 Windows DPAPI 保护的 RDCMan 密码不会在 macOS 上解密，并会从恢复后的本地快照中移除。
+
+## 运行应用
+
+首先安装构建依赖：
 
 ```bash
 brew install cmake ninja pkg-config openssl@3
 ./scripts/bootstrap-freerdp.sh
 ```
 
-From this directory:
+在项目目录中运行：
 
 ```bash
 ./scripts/run.sh
 ```
 
-Import an `.rdg` file from the sidebar, select a server, and click `连接`. Open `RDGDesk > 设置…` or use the sidebar gear for:
+从侧边栏导入 `.rdg` 文件，选择服务器后点击 `连接`。打开 `RDGDesk > 设置…`，或点击侧边栏底部的齿轮，可以配置：
 
-- `通用`: restore the last library, double-click connection, and follow-window resize.
-- `全局凭据`: save, update, or remove the inherited Keychain credential.
-- `凭据覆盖`: search groups/servers, set an override, or restore inheritance.
-- `证书`: inspect or remove saved endpoint pins for future connections.
-- `关于`: version and privacy information.
+- `通用`：启动时恢复上次资源库、双击连接和远程画面跟随窗口尺寸。
+- `全局凭据`：保存、更新或删除继承使用的钥匙串凭据。
+- `凭据覆盖`：搜索分组/服务器、设置覆盖凭据或恢复继承。
+- `证书`：查看或删除为后续连接保存的端点指纹。
+- `关于`：查看版本和隐私信息。
 
-The debug-only `使用外部客户端调试` action creates a temporary `.rdp` file. Ordinary connections always use embedded FreeRDP.
+仅供调试的 `使用外部客户端调试` 操作会创建临时 `.rdp` 文件。普通连接始终使用内置 FreeRDP。
 
-## Creating a self-use app
+## 创建自用安装包
 
 ```bash
 RDC_SWIFTPM_DISABLE_SANDBOX=1 ./scripts/package-app.sh --dmg
 ```
 
-This creates `dist/RDGDesk.app` and `dist/RDGDesk.dmg`, bundles the FreeRDP/OpenSSL runtime libraries and their license texts, and applies an ad-hoc signature. It is intended for the owner's Macs. Because it is not Developer ID signed or notarized, macOS may require Control-clicking the app and choosing `打开` on first launch. Public distribution requires a paid Apple Developer identity, hardened-runtime signing, notarization, and a release-specific third-party dependency audit.
+该命令会生成 `dist/RDGDesk.app` 和 `dist/RDGDesk.dmg`，将 FreeRDP/OpenSSL 运行库及其许可证文本打包到应用中，并应用临时签名。此安装包适合在所有者自己的 Mac 上使用。由于它没有使用 Developer ID 签名，也没有经过 Apple 公证，macOS 首次启动时可能需要按住 Control 点击应用并选择 `打开`。公开分发需要付费 Apple Developer 身份、Hardened Runtime 签名、公证，以及针对具体发行版本的第三方依赖审计。
 
-## Development and verification
+## 开发与验证
 
 ```bash
 ./scripts/test.sh
@@ -58,40 +68,40 @@ This creates `dist/RDGDesk.app` and `dist/RDGDesk.dmg`, bundles the FreeRDP/Open
 bash -n scripts/*.sh
 ```
 
-In a managed environment that blocks nested `sandbox-exec`, use:
+在禁止嵌套 `sandbox-exec` 的受管环境中，可以使用：
 
 ```bash
 RDC_SWIFTPM_DISABLE_SANDBOX=1 ./scripts/build.sh
 ./scripts/test.sh --disable-sandbox
 ```
 
-Real-server coverage is opt-in and requires all of `RDC_TEST_HOST`, `RDC_TEST_PORT`, `RDC_TEST_USER`, `RDC_TEST_DOMAIN`, `RDC_TEST_PASSWORD`, and `RDC_TEST_EXPECTED_SHA256` (uppercase or lowercase colon-delimited SHA-256). Missing or invalid configuration never prints environment values. Real Keychain integration is separately enabled with `RDC_TEST_KEYCHAIN=1`; it uses random `integration-<UUID>` item IDs and cleans them up.
+真实服务器测试默认关闭，需要同时设置 `RDC_TEST_HOST`、`RDC_TEST_PORT`、`RDC_TEST_USER`、`RDC_TEST_DOMAIN`、`RDC_TEST_PASSWORD` 和 `RDC_TEST_EXPECTED_SHA256`。SHA-256 可以使用大写或小写、以冒号分隔。配置缺失或无效时，错误信息不会输出环境变量值。真实钥匙串集成测试需另行设置 `RDC_TEST_KEYCHAIN=1`；测试使用随机的 `integration-<UUID>` 项目 ID，并在完成后清理。
 
-Private large-library acceptance coverage is opt-in with `RDC_TEST_RDG_PATH=/absolute/path/to/library.rdg`. Never commit a real `.rdg` file: it may contain internal hostnames, server addresses, usernames, and Windows DPAPI ciphertext.
+私有大型资源库验收测试默认关闭，可通过 `RDC_TEST_RDG_PATH=/absolute/path/to/library.rdg` 启用。切勿提交真实 `.rdg` 文件：文件中可能包含内部主机名、服务器地址、用户名和 Windows DPAPI 密文。
 
-No password should be placed in source files, fixtures, command output, issue reports, or verification documents. Enter real credentials only in your local environment or the app's secure UI.
+不要把密码写入源代码、测试夹具、命令输出、Issue 或验证文档。真实凭据只能在本机环境或应用的安全界面中输入。
 
-## Project shape
+## 项目结构
 
-- `Sources/RdcApp`: SwiftUI/AppKit application, settings, credential, certificate, and remote-canvas UI.
-- `Sources/RdcCore`: parser, sanitized persistence, Keychain vault, trust coordination, and embedded session engine.
-- `Tests/RdcCoreTests`: deterministic unit and loopback coverage.
-- `Tests/RdcAppTests`: application workflow and presentation coverage.
-- `Tests/RdcFreeRDPIntegrationTests`: deterministic changed-pin tests plus opt-in real server and Keychain workflows.
-- `scripts`: repeatable bootstrap, build, run, test, and scope-validation commands.
+- `Sources/RdcApp`：SwiftUI/AppKit 应用、设置、凭据、证书和远程画布界面。
+- `Sources/RdcCore`：解析器、脱敏持久化、钥匙串保管库、信任协调和内置会话引擎。
+- `Tests/RdcCoreTests`：可重复的单元测试和本地回环测试。
+- `Tests/RdcAppTests`：应用工作流和界面呈现测试。
+- `Tests/RdcFreeRDPIntegrationTests`：可重复的证书指纹变化测试，以及可选的真实服务器和钥匙串工作流测试。
+- `scripts`：可重复执行的依赖安装、构建、运行、测试和范围验证命令。
 
-## Security
+## 安全
 
-Please report vulnerabilities privately as described in [SECURITY.md](SECURITY.md). Do not include real credentials, `.rdg` files, certificate pins, server addresses, or connection logs in public issues.
+请按照 [SECURITY.md](SECURITY.md) 的说明私密报告安全漏洞。不要在公开 Issue 中包含真实凭据、`.rdg` 文件、证书指纹、服务器地址或连接日志。
 
-## Compatibility and trademarks
+## 兼容性与商标
 
-RDGDesk is an independent project. It is not affiliated with, sponsored by, endorsed by, or distributed by Microsoft. Microsoft, Windows, Remote Desktop Connection Manager, RDCMan, and other Microsoft product names are used only in plain text to describe file-format and protocol compatibility; the corresponding names and trademarks belong to their respective owners.
+RDGDesk 是独立项目，与 Microsoft 不存在关联，也未获得 Microsoft 的赞助、认可或分发授权。Microsoft、Windows、Remote Desktop Connection Manager、RDCMan 及其他 Microsoft 产品名称仅以普通文本用于描述文件格式和协议兼容性；相关名称和商标归各自权利人所有。
 
-RDGDesk does not include Microsoft logos, Windows interface artwork, RDCMan binaries, or Microsoft source code.
+RDGDesk 不包含 Microsoft 标志、Windows 界面素材、RDCMan 二进制文件或 Microsoft 源代码。
 
-See [TRADEMARKS.md](TRADEMARKS.md) for the standalone trademark notice.
+独立商标声明请参阅 [TRADEMARKS.md](TRADEMARKS.md)。
 
-## License and third-party software
+## 许可证与第三方软件
 
-RDGDesk source code is available under the [MIT License](LICENSE). It integrates with FreeRDP and OpenSSL; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for attribution and redistribution notes.
+RDGDesk 源代码采用 [MIT License](LICENSE) 开源。项目集成 FreeRDP 和 OpenSSL；署名及再分发说明请参阅 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
