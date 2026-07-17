@@ -2,6 +2,7 @@
 .build/vendor/
 .build/integration/
 .swiftpm/
+.worktrees/
 DerivedData/
 dist/
 .DS_Store
