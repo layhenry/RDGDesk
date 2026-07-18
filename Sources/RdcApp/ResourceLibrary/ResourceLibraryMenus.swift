@@ -14,6 +14,7 @@ enum ResourceMenuItem: Equatable {
     case properties
     case serverCredential
     case groupCredential
+    case newServer
     case newChildGroup
     case moveServer
     case moveGroup
@@ -21,6 +22,15 @@ enum ResourceMenuItem: Equatable {
     case deleteServer
     case deleteGroup
     case removeLibrary
+}
+
+enum SidebarAddMenuItem: Hashable {
+    case newServer
+    case importLibrary
+}
+
+enum SidebarAddMenuPolicy {
+    static let items: [SidebarAddMenuItem] = [.newServer, .importLibrary]
 }
 
 enum ResourceMenuPolicy {
@@ -39,10 +49,10 @@ enum ResourceMenuPolicy {
             [.connectOrDisconnect, .properties, .serverCredential, .separator,
              .moveServer, .deleteServer]
         case .group:
-            [.expandOrCollapse, .properties, .groupCredential, .newChildGroup,
+            [.expandOrCollapse, .properties, .groupCredential, .newServer, .newChildGroup,
              .moveGroup, .separator, .deleteGroup]
         case .rootGroup:
-            [.expandOrCollapse, .properties, .groupCredential, .newChildGroup,
+            [.expandOrCollapse, .properties, .groupCredential, .newServer, .newChildGroup,
              .separator, .removeLibrary]
         }
     }
@@ -275,6 +285,13 @@ struct ResourceLibraryRowMenu: View {
             scope: .group(id: group.id, displayName: group.name),
             hasBinding: model.configuration.groupCredentialBindings[group.id] != nil
         )
+        Button("添加服务器…") {
+            _ = model.requestNewServer(
+                targetGroupID: group.id,
+                targetGroupName: group.name,
+                ownerLease: ownerLease
+            )
+        }
         Button("新建子群组…") {
             _ = model.requestNewChildGroup(
                 parentID: group.id, parentName: group.name, ownerLease: ownerLease

@@ -10,16 +10,20 @@ final class SettingsPresentationTests: XCTestCase {
             .moveServer, .deleteServer
         ])
         XCTAssertEqual(ResourceMenuPolicy.items(for: .group, isConnected: false), [
-            .expandOrCollapse, .properties, .groupCredential, .newChildGroup,
+            .expandOrCollapse, .properties, .groupCredential, .newServer, .newChildGroup,
             .moveGroup, .separator, .deleteGroup
         ])
         let root = ResourceMenuPolicy.items(for: .rootGroup, isConnected: false)
         XCTAssertEqual(root, [
-            .expandOrCollapse, .properties, .groupCredential, .newChildGroup,
+            .expandOrCollapse, .properties, .groupCredential, .newServer, .newChildGroup,
             .separator, .removeLibrary
         ])
         XCTAssertFalse(root.contains(.moveGroup))
         XCTAssertFalse(root.contains(.deleteGroup))
+    }
+
+    func testSidebarAddMenuHasExactOrder() {
+        XCTAssertEqual(SidebarAddMenuPolicy.items, [.newServer, .importLibrary])
     }
 
     func testPendingGroupDeletionUsesExactRecursiveWarningCopy() {

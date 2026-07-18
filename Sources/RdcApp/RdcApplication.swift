@@ -134,6 +134,10 @@ struct RdcRootView: View {
         .sheet(item: credentialEditorBinding(lease: credentialEditorLease)) { item in
             CredentialEditorSheet(model: model, scope: item.scope, host: item.host)
         }
+        .sheet(item: newServerBinding(lease: credentialEditorLease)) { presentation in
+            NewServerSheet(request: presentation.request, model: model)
+                .onDisappear { newServerSheetDidDisappear(presentation) }
+        }
         .sheet(item: newChildGroupBinding(lease: credentialEditorLease)) { presentation in
             NewChildGroupSheet(request: presentation.request, model: model)
                 .onDisappear { newChildGroupSheetDidDisappear(presentation) }
@@ -447,6 +451,38 @@ struct RdcRootView: View {
         )
     }
 
+    private func newServerBinding(
+        lease: ResourcePropertySheetCoordinator.HostLease?
+    ) -> Binding<ResourcePropertySheetCoordinator.NewServerPresentation?> {
+        let captured = lease.flatMap {
+            resourcePropertyCoordinator.newServerPresentation(
+                requested: model.newServerRequest, lease: $0
+            )
+        }
+        return Binding(
+            get: {
+                guard let lease else { return nil }
+                return resourcePropertyCoordinator.newServerPresentation(
+                    requested: model.newServerRequest, lease: lease
+                )
+            },
+            set: { value in
+                guard value == nil, let captured else { return }
+                newServerSheetDidDisappear(captured)
+            }
+        )
+    }
+
+    private func newServerSheetDidDisappear(
+        _ presentation: ResourcePropertySheetCoordinator.NewServerPresentation
+    ) {
+        guard resourcePropertyCoordinator.dismissNewServer(presentation) else { return }
+        if model.newServerRequest == presentation.request {
+            model.newServerRequest = nil
+        }
+        synchronizeResourcePropertyPresentation(lease: presentation.lease)
+    }
+
     private func newChildGroupSheetDidDisappear(
         _ presentation: ResourcePropertySheetCoordinator.NewChildGroupPresentation
     ) {
@@ -533,6 +569,17 @@ struct RdcRootView: View {
         if let deletion = model.pendingResourceDeletion {
             let result = resourcePropertyCoordinator.claimDeletion(
                 deletion,
+                lease: lease,
+                activeCredential: model.credentialEditorPresentation,
+                isOneTimeCredentialPromptRequested: model.isShowingCredentialSheet
+            )
+            if result == .claimed || result == .alreadyOwned {
+                return
+            }
+        }
+        if let request = model.newServerRequest {
+            let result = resourcePropertyCoordinator.claimNewServer(
+                request,
                 lease: lease,
                 activeCredential: model.credentialEditorPresentation,
                 isOneTimeCredentialPromptRequested: model.isShowingCredentialSheet
@@ -654,20 +701,27 @@ private struct ResourceLibrarySidebarView: View {
 
             Spacer()
 
-            Button {
-                model.isShowingImporter = true
+            Menu {
+                ForEach(SidebarAddMenuPolicy.items, id: \.self) { item in
+                    switch item {
+                    case .newServer:
+                        Button("添加服务器…", systemImage: "desktopcomputer") {
+                            requestNewServerAtRoot()
+                        }
+                    case .importLibrary:
+                        Button("导入 .rdg…", systemImage: "tray.and.arrow.down") {
+                            model.isShowingImporter = true
+                        }
+                    }
+                }
             } label: {
                 Image(systemName: "plus")
                     .font(.system(size: 15, weight: .medium))
                     .frame(width: 30, height: 30)
             }
-            .buttonStyle(.plain)
-            .background(Color.white.opacity(0.55), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(Color.black.opacity(0.08), lineWidth: 1)
-            }
-            .help("导入兼容 RDCMan 的 .rdg 文件")
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .help("添加服务器或导入 .rdg")
         }
     }
 
@@ -695,9 +749,10 @@ private struct ResourceLibrarySidebarView: View {
         ScrollView {
             if let sidebar {
                 if sidebar.rows.isEmpty {
-                    SidebarEmptyView(importAction: {
-                        model.isShowingImporter = true
-                    })
+                    SidebarEmptyView(
+                        addServerAction: requestNewServerAtRoot,
+                        importAction: { model.isShowingImporter = true }
+                    )
                     .padding(.top, 24)
                 } else {
                     LazyVStack(alignment: .leading, spacing: 4) {
@@ -715,9 +770,10 @@ private struct ResourceLibrarySidebarView: View {
                     .padding(.vertical, 2)
                 }
             } else {
-                SidebarEmptyView(importAction: {
-                    model.isShowingImporter = true
-                })
+                SidebarEmptyView(
+                    addServerAction: requestNewServerAtRoot,
+                    importAction: { model.isShowingImporter = true }
+                )
                 .padding(.top, 24)
             }
         }
@@ -768,6 +824,15 @@ private struct ResourceLibrarySidebarView: View {
         }
     }
 
+    private func requestNewServerAtRoot() {
+        guard let ownerLease else { return }
+        _ = model.requestNewServer(
+            targetGroupID: model.configuration.lastLibrary?.root.id,
+            targetGroupName: model.configuration.lastLibrary?.root.name ?? "我的服务器",
+            ownerLease: ownerLease
+        )
+    }
+
     private func resetExpandedGroups() {
         guard model.library != nil else {
             expandedGroupIDs = []
@@ -778,23 +843,26 @@ private struct ResourceLibrarySidebarView: View {
 }
 
 private struct SidebarEmptyView: View {
+    let addServerAction: () -> Void
     let importAction: () -> Void
 
     var body: some View {
         VStack(spacing: 12) {
-            Image(systemName: "tray.and.arrow.down")
-                .font(.system(size: 28, weight: .regular))
+            Image(systemName: "desktopcomputer")
+                .font(.system(size: 28))
                 .foregroundStyle(.secondary)
-            Text("导入 .rdg 文件")
+            Text("添加第一台服务器")
                 .font(.system(size: 14, weight: .semibold))
-            Text("选择兼容 RDCMan 的 .rdg 文件")
+            Text("手动输入服务器地址，或导入兼容 RDCMan 的 .rdg 文件")
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-            Button("导入") {
-                importAction()
+            HStack {
+                Button("添加服务器", action: addServerAction)
+                    .buttonStyle(.borderedProminent)
+                Button("导入 .rdg", action: importAction)
+                    .buttonStyle(.bordered)
             }
-            .buttonStyle(.borderedProminent)
             .controlSize(.small)
         }
         .frame(maxWidth: .infinity)
@@ -1030,7 +1098,7 @@ private struct EmptySessionCanvas: View {
                 .foregroundStyle(.secondary)
             Text("选择一个远程桌面")
                 .font(.system(size: 19, weight: .semibold))
-            Text("导入兼容 RDCMan 的 .rdg 文件后，左侧会显示服务器列表。")
+            Text("添加服务器或导入兼容 RDCMan 的 .rdg 文件。")
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
             Button("导入 .rdg") {
