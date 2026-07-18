@@ -1585,6 +1585,39 @@ final class SettingsPresentationTests: XCTestCase {
         XCTAssertEqual(editor.draft?.host, "2001:db8::10")
     }
 
+    func testNewServerEditorDefaultsPortAndOnlyAutoNamesUntilUserEditsName() {
+        let editor = NewServerEditorModel()
+        XCTAssertEqual(editor.portText, "3389")
+        XCTAssertFalse(editor.canSave)
+
+        editor.updateHost("203.0.113.170")
+        XCTAssertEqual(editor.name, "203.0.113.170")
+        XCTAssertTrue(editor.canSave)
+
+        editor.updateName("生产服务器")
+        editor.updateHost("106.54.202.171")
+        XCTAssertEqual(editor.name, "生产服务器")
+        XCTAssertEqual(editor.draft?.host, "106.54.202.171")
+    }
+
+    func testNewServerEditorExposesFieldErrorsAndKeepsInputAfterSaveFailure() async {
+        let editor = NewServerEditorModel()
+        editor.updateName("Server")
+        editor.updateHost("999.1.1.1")
+        editor.portText = "70000"
+        XCTAssertEqual(editor.hostError, "请输入有效的 IP 地址或主机名。")
+        XCTAssertEqual(editor.portError, "端口必须是 1–65535 之间的整数。")
+
+        editor.updateHost("server.example")
+        editor.portText = "3389"
+        let saved = await editor.save { _ in
+            throw ResourceLibraryOperationError.libraryChanged
+        }
+        XCTAssertFalse(saved)
+        XCTAssertEqual(editor.name, "Server")
+        XCTAssertEqual(editor.saveError, ResourceLibraryOperationError.libraryChanged.safeMessage)
+    }
+
     private func fixtureLibrary() -> RdcImportedLibrary {
         let root = RdcGroup(
             name: "Root",
