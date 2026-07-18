@@ -33,6 +33,17 @@ enum SidebarAddMenuPolicy {
     static let items: [SidebarAddMenuItem] = [.newServer, .importLibrary]
 }
 
+enum SidebarNewServerTargetPolicy {
+    static func target(
+        for library: RdcImportedLibrary?
+    ) -> (targetGroupID: String?, targetGroupName: String) {
+        guard let root = library?.groups.first(where: { $0.parentID == nil }) else {
+            return (nil, "我的服务器")
+        }
+        return (root.id, root.name)
+    }
+}
+
 enum ResourceMenuPolicy {
     enum ServerPrimaryAction: Equatable {
         case connect

@@ -26,6 +26,32 @@ final class SettingsPresentationTests: XCTestCase {
         XCTAssertEqual(SidebarAddMenuPolicy.items, [.newServer, .importLibrary])
     }
 
+    func testSidebarNewServerTargetUsesVisibleLibraryOrBootstrap() throws {
+        let bootstrap = SidebarNewServerTargetPolicy.target(for: nil)
+        XCTAssertNil(bootstrap.targetGroupID)
+        XCTAssertEqual(bootstrap.targetGroupName, "我的服务器")
+
+        let library = RdcImportedLibrary(
+            document: RdcManDocument(
+                programVersion: "2.7",
+                schemaVersion: "3",
+                root: RdcGroup(
+                    name: "Visible Root",
+                    isExpanded: true,
+                    logonCredentials: nil,
+                    groups: [],
+                    servers: []
+                )
+            ),
+            sourceID: "visible-library",
+            sourceName: "visible.rdg"
+        )
+        let root = try XCTUnwrap(library.groups.first { $0.parentID == nil })
+        let visible = SidebarNewServerTargetPolicy.target(for: library)
+        XCTAssertEqual(visible.targetGroupID, root.id)
+        XCTAssertEqual(visible.targetGroupName, root.name)
+    }
+
     func testPendingGroupDeletionUsesExactRecursiveWarningCopy() {
         let coordinator = ResourcePropertySheetCoordinator()
         let lease = coordinator.register(host: .primaryWindow(id: UUID()))

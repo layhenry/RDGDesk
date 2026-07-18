@@ -826,9 +826,10 @@ private struct ResourceLibrarySidebarView: View {
 
     private func requestNewServerAtRoot() {
         guard let ownerLease else { return }
+        let target = SidebarNewServerTargetPolicy.target(for: model.library)
         _ = model.requestNewServer(
-            targetGroupID: model.configuration.lastLibrary?.root.id,
-            targetGroupName: model.configuration.lastLibrary?.root.name ?? "我的服务器",
+            targetGroupID: target.targetGroupID,
+            targetGroupName: target.targetGroupName,
             ownerLease: ownerLease
         )
     }
