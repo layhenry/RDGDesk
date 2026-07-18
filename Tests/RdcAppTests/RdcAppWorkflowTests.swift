@@ -321,6 +321,360 @@ final class RdcAppWorkflowTests: XCTestCase {
         await model.shutdownAndWait()
     }
 
+    func testHiddenImportedBootstrapCleansOrphansAndKeepsGlobalCredential() async throws {
+        let hidden = RdcLibrarySnapshot(
+            sourceID: "hidden-cleanup-source",
+            sourceName: "hidden-cleanup.rdg",
+            document: nestedDocument()
+        )
+        let hiddenGroupID = try XCTUnwrap(hidden.root.groups.first?.id)
+        let hiddenServerID = try XCTUnwrap(hidden.allServers.first?.id)
+        let hiddenEndpoint = RdpEndpoint(host: "nested.example.invalid", port: 3_389)
+        let unrelatedEndpoint = RdpEndpoint(host: "unrelated.example.invalid", port: 3_389)
+        let hiddenPin = CertificatePin(
+            endpoint: hiddenEndpoint,
+            subject: "hidden",
+            issuer: "fixture",
+            sha256Fingerprint: "AA",
+            notBefore: nil,
+            notAfter: nil,
+            firstTrustedAt: .distantPast,
+            lastConfirmedAt: .distantPast
+        )
+        let unrelatedPin = CertificatePin(
+            endpoint: unrelatedEndpoint,
+            subject: "unrelated",
+            issuer: "fixture",
+            sha256Fingerprint: "BB",
+            notBefore: nil,
+            notAfter: nil,
+            firstTrustedAt: .distantPast,
+            lastConfirmedAt: .distantPast
+        )
+        let exclusiveCredentialID = "hidden-exclusive-credential"
+        let globalCredentialID = "hidden-global-credential"
+        let globalMetadata = CredentialMetadata(
+            id: globalCredentialID,
+            username: "global-user",
+            domain: nil
+        )
+        let initial = RdcAppConfiguration(
+            globalCredentialID: globalCredentialID,
+            groupCredentialBindings: [hiddenGroupID: exclusiveCredentialID],
+            serverCredentialBindings: [hiddenServerID: globalCredentialID],
+            credentialMetadata: [
+                exclusiveCredentialID: .init(
+                    id: exclusiveCredentialID,
+                    username: "exclusive-user",
+                    domain: "LAB"
+                ),
+                globalCredentialID: globalMetadata
+            ],
+            certificatePins: [
+                hiddenEndpoint: hiddenPin,
+                unrelatedEndpoint: unrelatedPin
+            ],
+            lastLibrary: hidden,
+            preferences: .init(restoresLastLibrary: false)
+        )
+        let store = AppControlledConfigurationStore(configuration: initial)
+        let passwordStore = AppMemoryPasswordStore(passwords: [
+            exclusiveCredentialID: "exclusive-fixture-secret",
+            globalCredentialID: "global-fixture-secret"
+        ])
+        let engine = AppRecordingSessionEngine()
+        let model = RdcAppModel(
+            configurationRepository: RdcConfigurationRepository(store: store),
+            passwordStore: passwordStore,
+            engine: engine
+        )
+        await model.loadPersistedState()
+        XCTAssertNil(model.library)
+        let hiddenServer = try XCTUnwrap(
+            hidden.makeLibrary().servers.first { $0.id == hiddenServerID }
+        )
+        try await model.session.connect(
+            server: hiddenServer,
+            credential: nil,
+            viewport: .init(width: 800, height: 600)
+        )
+        let sessionBefore = model.session.descriptor
+
+        let serverID = try await model.createServer(
+            destination: .localLibrary(name: "我的服务器"),
+            expectedSnapshot: hidden,
+            draft: .init(displayName: "Visible Local", host: "198.51.100.95", port: 3_389)
+        )
+
+        let persisted = await store.current()
+        let saveCount = await store.savedCount()
+        let disconnectCount = await engine.disconnectCount()
+        let exclusivePassword = await passwordStore.passwordFingerprint(
+            credentialID: exclusiveCredentialID
+        )
+        let globalPassword = await passwordStore.passwordFingerprint(
+            credentialID: globalCredentialID
+        )
+        let deletedCredentialIDs = await passwordStore.deletedCredentialIDs()
+        XCTAssertEqual(persisted.lastLibrary?.sourceID, ResourceLibraryEditor.localLibrarySourceID)
+        XCTAssertEqual(persisted.lastLibrary?.allServers.compactMap(\.id), [serverID])
+        XCTAssertTrue(persisted.groupCredentialBindings.isEmpty)
+        XCTAssertTrue(persisted.serverCredentialBindings.isEmpty)
+        XCTAssertNil(persisted.credentialMetadata[exclusiveCredentialID])
+        XCTAssertEqual(persisted.globalCredentialID, globalCredentialID)
+        XCTAssertEqual(persisted.credentialMetadata[globalCredentialID], globalMetadata)
+        XCTAssertNil(exclusivePassword)
+        XCTAssertNotNil(globalPassword)
+        XCTAssertEqual(deletedCredentialIDs, [exclusiveCredentialID])
+        XCTAssertNil(persisted.certificatePins[hiddenEndpoint])
+        XCTAssertEqual(persisted.certificatePins[unrelatedEndpoint], unrelatedPin)
+        XCTAssertEqual(saveCount, 1)
+        XCTAssertEqual(model.configuration, persisted)
+        XCTAssertEqual(model.selectedServerID, serverID)
+        XCTAssertEqual(model.session.descriptor, sessionBefore)
+        XCTAssertEqual(disconnectCount, 0)
+        await model.shutdownAndWait()
+    }
+
+    func testHiddenImportedBootstrapSaveFailureRestoresPasswordAndConfiguration() async throws {
+        let hidden = RdcLibrarySnapshot(
+            sourceID: "hidden-bootstrap-save-failure",
+            sourceName: "hidden.rdg",
+            document: testDocument()
+        )
+        let hiddenServerID = try XCTUnwrap(hidden.allServers.first?.id)
+        let credentialID = "hidden-bootstrap-rollback-credential"
+        let endpoint = RdpEndpoint(host: "rdp.example.invalid", port: 3_389)
+        let pin = CertificatePin(
+            endpoint: endpoint,
+            subject: "hidden",
+            issuer: "fixture",
+            sha256Fingerprint: "CC",
+            notBefore: nil,
+            notAfter: nil,
+            firstTrustedAt: .distantPast,
+            lastConfirmedAt: .distantPast
+        )
+        let initial = RdcAppConfiguration(
+            serverCredentialBindings: [hiddenServerID: credentialID],
+            credentialMetadata: [credentialID: .init(
+                id: credentialID,
+                username: "rollback-user",
+                domain: nil
+            )],
+            certificatePins: [endpoint: pin],
+            lastLibrary: hidden,
+            preferences: .init(restoresLastLibrary: false)
+        )
+        let store = AppControlledConfigurationStore(
+            configuration: initial,
+            failingSaveNumbers: [1]
+        )
+        let passwordStore = AppMemoryPasswordStore(passwords: [
+            credentialID: "rollback-fixture-secret"
+        ])
+        let model = RdcAppModel(
+            configurationRepository: RdcConfigurationRepository(store: store),
+            passwordStore: passwordStore,
+            engine: AppRecordingSessionEngine()
+        )
+        await model.loadPersistedState()
+
+        let error = await captureError {
+            _ = try await model.createServer(
+                destination: .localLibrary(name: "我的服务器"),
+                expectedSnapshot: hidden,
+                draft: .init(displayName: "New Local", host: "203.0.113.95", port: 3_389)
+            )
+        }
+
+        let persisted = await store.current()
+        let deletedCredentialIDs = await passwordStore.deletedCredentialIDs()
+        let savedCredentialIDs = await passwordStore.savedCredentialIDs()
+        let password = await passwordStore.passwordFingerprint(credentialID: credentialID)
+        XCTAssertEqual(error as? ResourceLibraryOperationError, .configurationSaveFailed)
+        XCTAssertEqual(persisted, initial)
+        XCTAssertEqual(model.configuration, initial)
+        XCTAssertNil(model.library)
+        XCTAssertNotNil(password)
+        XCTAssertEqual(deletedCredentialIDs, [credentialID])
+        XCTAssertEqual(savedCredentialIDs, [credentialID])
+        XCTAssertEqual(
+            model.resourceOperationMessage,
+            ResourceLibraryOperationError.configurationSaveFailed.safeMessage
+        )
+        await model.shutdownAndWait()
+    }
+
+    func testHiddenImportedBootstrapPasswordDeleteFailureUsesSafeError() async throws {
+        let hidden = RdcLibrarySnapshot(
+            sourceID: "hidden-bootstrap-delete-failure",
+            sourceName: "hidden.rdg",
+            document: testDocument()
+        )
+        let hiddenServerID = try XCTUnwrap(hidden.allServers.first?.id)
+        let credentialID = "hidden-bootstrap-delete-credential"
+        let initial = RdcAppConfiguration(
+            serverCredentialBindings: [hiddenServerID: credentialID],
+            credentialMetadata: [credentialID: .init(
+                id: credentialID,
+                username: "delete-user",
+                domain: nil
+            )],
+            lastLibrary: hidden,
+            preferences: .init(restoresLastLibrary: false)
+        )
+        let store = AppControlledConfigurationStore(configuration: initial)
+        let passwordStore = AppMemoryPasswordStore(
+            passwords: [credentialID: "delete-fixture-secret"],
+            failingDeleteIDs: [credentialID]
+        )
+        let model = RdcAppModel(
+            configurationRepository: RdcConfigurationRepository(store: store),
+            passwordStore: passwordStore,
+            engine: AppRecordingSessionEngine()
+        )
+        await model.loadPersistedState()
+
+        let error = await captureError {
+            _ = try await model.createServer(
+                destination: .localLibrary(name: "我的服务器"),
+                expectedSnapshot: hidden,
+                draft: .init(displayName: "New Local", host: "192.0.2.95", port: 3_389)
+            )
+        }
+
+        let persisted = await store.current()
+        let saveCount = await store.savedCount()
+        let password = await passwordStore.passwordFingerprint(credentialID: credentialID)
+        XCTAssertEqual(error as? ResourceLibraryOperationError, .passwordStoreFailed)
+        XCTAssertEqual(persisted, initial)
+        XCTAssertEqual(model.configuration, initial)
+        XCTAssertEqual(saveCount, 0)
+        XCTAssertNotNil(password)
+        XCTAssertEqual(
+            model.resourceOperationMessage,
+            ResourceLibraryOperationError.passwordStoreFailed.safeMessage
+        )
+        await model.shutdownAndWait()
+    }
+
+    func testHiddenImportedBootstrapRollbackFailureUsesHighSeveritySafeError() async throws {
+        let hidden = RdcLibrarySnapshot(
+            sourceID: "hidden-bootstrap-rollback-failure",
+            sourceName: "hidden.rdg",
+            document: testDocument()
+        )
+        let hiddenServerID = try XCTUnwrap(hidden.allServers.first?.id)
+        let credentialID = "hidden-bootstrap-rollback-failure-credential"
+        let initial = RdcAppConfiguration(
+            serverCredentialBindings: [hiddenServerID: credentialID],
+            credentialMetadata: [credentialID: .init(
+                id: credentialID,
+                username: "rollback-user",
+                domain: nil
+            )],
+            lastLibrary: hidden,
+            preferences: .init(restoresLastLibrary: false)
+        )
+        let store = AppControlledConfigurationStore(
+            configuration: initial,
+            failingSaveNumbers: [1]
+        )
+        let passwordStore = AppMemoryPasswordStore(
+            passwords: [credentialID: "rollback-fixture-secret"],
+            failingSaveIDs: [credentialID]
+        )
+        let model = RdcAppModel(
+            configurationRepository: RdcConfigurationRepository(store: store),
+            passwordStore: passwordStore,
+            engine: AppRecordingSessionEngine()
+        )
+        await model.loadPersistedState()
+
+        let error = await captureError {
+            _ = try await model.createServer(
+                destination: .localLibrary(name: "我的服务器"),
+                expectedSnapshot: hidden,
+                draft: .init(displayName: "New Local", host: "192.0.2.96", port: 3_389)
+            )
+        }
+
+        let persisted = await store.current()
+        let password = await passwordStore.passwordFingerprint(credentialID: credentialID)
+        XCTAssertEqual(error as? ResourceLibraryOperationError, .passwordRollbackFailed)
+        XCTAssertEqual(persisted, initial)
+        XCTAssertEqual(model.configuration, initial)
+        XCTAssertNil(password)
+        XCTAssertEqual(
+            model.resourceOperationMessage,
+            ResourceLibraryOperationError.passwordRollbackFailed.safeMessage
+        )
+        await model.shutdownAndWait()
+    }
+
+    func testDecodedLegacyHiddenImportedLibraryBootstrapsWithoutFalseManualRefusal() async throws {
+        let hidden = try JSONDecoder().decode(
+            RdcLibrarySnapshot.self,
+            from: Data(
+                #"""
+                {
+                  "sourceID": "legacy-hidden-imported",
+                  "sourceName": "legacy-hidden.rdg",
+                  "programVersion": "2.7",
+                  "schemaVersion": "3",
+                  "root": {
+                    "name": "Root",
+                    "isExpanded": true,
+                    "groups": [{
+                      "name": "Imported Group",
+                      "isExpanded": true,
+                      "groups": [],
+                      "servers": [{
+                        "displayName": "Imported Server",
+                        "address": "legacy.example.invalid:3389"
+                      }]
+                    }],
+                    "servers": []
+                  }
+                }
+                """#.utf8
+            )
+        )
+        let initial = RdcAppConfiguration(
+            lastLibrary: hidden,
+            preferences: .init(restoresLastLibrary: false)
+        )
+        let store = AppControlledConfigurationStore(configuration: initial)
+        let model = RdcAppModel(
+            configurationRepository: RdcConfigurationRepository(store: store),
+            passwordStore: AppMemoryPasswordStore(),
+            engine: AppRecordingSessionEngine()
+        )
+        await model.loadPersistedState()
+        XCTAssertNil(model.library)
+        var createdServerID: String?
+        var creationError: Error?
+
+        do {
+            createdServerID = try await model.createServer(
+                destination: .localLibrary(name: "我的服务器"),
+                expectedSnapshot: hidden,
+                draft: .init(displayName: "New Local", host: "198.51.100.96", port: 3_389)
+            )
+        } catch {
+            creationError = error
+        }
+
+        let serverID = try XCTUnwrap(createdServerID)
+        let persisted = await store.current()
+        XCTAssertNil(creationError)
+        XCTAssertEqual(persisted.lastLibrary?.sourceID, ResourceLibraryEditor.localLibrarySourceID)
+        XCTAssertEqual(persisted.lastLibrary?.allServers.compactMap(\.id), [serverID])
+        XCTAssertEqual(model.selectedServerID, serverID)
+        await model.shutdownAndWait()
+    }
+
     func testPersistedSourceIDSidebarRowsSelectRealServersImmediately() async throws {
         let snapshot = RdcLibrarySnapshot(
             sourceID: "persisted-source-that-is-not-the-compatibility-id",
@@ -4023,23 +4377,98 @@ final class RdcAppWorkflowTests: XCTestCase {
 
         XCTAssertNil(model.pendingLibraryReplacement)
         XCTAssertNil(model.importError)
-        let persisted = await store.current()
+        let firstPersisted = await store.current()
         let retainedParent = try XCTUnwrap(
-            persisted.lastLibrary?.root.groups.first { $0.id == parentID }
+            firstPersisted.lastLibrary?.root.groups.first { $0.id == parentID }
         )
         XCTAssertEqual(retainedParent.name, "Imported Parent")
         XCTAssertNil(retainedParent.sourceFingerprint)
         XCTAssertTrue(retainedParent.servers.contains { $0.id == creation.serverID })
-        XCTAssertFalse(persisted.lastLibrary?.allServers.contains {
+        XCTAssertFalse(firstPersisted.lastLibrary?.allServers.contains {
             $0.id == importedServerID
         } ?? true)
         if let newParentName {
-            XCTAssertTrue(persisted.lastLibrary?.root.groups.contains {
+            XCTAssertTrue(firstPersisted.lastLibrary?.root.groups.contains {
                 $0.name == newParentName && $0.id != parentID && $0.sourceFingerprint != nil
             } ?? false)
         }
-        XCTAssertEqual(persisted.serverCredentialBindings[creation.serverID], manualCredentialID)
-        XCTAssertEqual(persisted.credentialMetadata[manualCredentialID], manualMetadata)
+        XCTAssertEqual(
+            firstPersisted.serverCredentialBindings[creation.serverID],
+            manualCredentialID
+        )
+        XCTAssertEqual(firstPersisted.credentialMetadata[manualCredentialID], manualMetadata)
+        XCTAssertNil(firstPersisted.serverCredentialBindings[importedServerID])
+        XCTAssertNil(firstPersisted.credentialMetadata[importedCredentialID])
+        XCTAssertEqual(model.selectedServerID, creation.serverID)
+
+        let decodedConfiguration = try JSONDecoder().decode(
+            RdcAppConfiguration.self,
+            from: JSONEncoder().encode(firstPersisted)
+        )
+        await model.shutdownAndWait()
+        let reloadStore = AppMemoryConfigurationStore(configuration: decodedConfiguration)
+        let reloadedModel = RdcAppModel(
+            configurationRepository: RdcConfigurationRepository(store: reloadStore),
+            passwordStore: passwordStore,
+            engine: AppRecordingSessionEngine()
+        )
+        await reloadedModel.loadPersistedState()
+        let afterReload = await reloadStore.current()
+        let reloadedShell = try XCTUnwrap(
+            afterReload.lastLibrary?.root.groups.first { $0.id == parentID }
+        )
+        XCTAssertEqual(reloadedShell.name, "Imported Parent")
+        XCTAssertNil(reloadedShell.sourceFingerprint)
+        XCTAssertEqual(reloadedShell.servers.compactMap(\.id), [creation.serverID])
+
+        reloadedModel.selectServer(id: creation.serverID)
+        await reloadedModel.importLibrary(
+            document: parentChangeWorkflowDocument(parentName: newParentName),
+            sourceName: "parent-change.rdg",
+            sourceIdentity: identity
+        )
+        XCTAssertNil(reloadedModel.pendingLibraryReplacement)
+        XCTAssertNil(reloadedModel.importError)
+        let afterSecondReimport = await reloadStore.current()
+        let repeatedShell = try XCTUnwrap(
+            afterSecondReimport.lastLibrary?.root.groups.first { $0.id == parentID }
+        )
+        XCTAssertEqual(repeatedShell.name, "Imported Parent")
+        XCTAssertNil(repeatedShell.sourceFingerprint)
+        XCTAssertEqual(repeatedShell.servers.compactMap(\.id), [creation.serverID])
+
+        await reloadedModel.importLibrary(
+            document: parentChangeWorkflowDocument(parentName: "Imported Parent"),
+            sourceName: "parent-change.rdg",
+            sourceIdentity: identity
+        )
+        XCTAssertNil(reloadedModel.pendingLibraryReplacement)
+        XCTAssertNil(reloadedModel.importError)
+        let final = await reloadStore.current()
+        let finalSnapshot = try XCTUnwrap(final.lastLibrary)
+        let originalFingerprint = try XCTUnwrap(
+            original.root.groups.first?.sourceFingerprint
+        )
+        let localShell = try XCTUnwrap(finalSnapshot.root.groups.first {
+            $0.id == parentID && $0.sourceFingerprint == nil
+        })
+        let returnedImportedParent = try XCTUnwrap(finalSnapshot.root.groups.first {
+            $0.sourceFingerprint == originalFingerprint
+        })
+        let finalGroupIDs = finalSnapshot.makeLibrary().groups.map(\.id)
+        XCTAssertEqual(localShell.name, "Imported Parent")
+        XCTAssertEqual(localShell.servers.compactMap(\.id), [creation.serverID])
+        XCTAssertNotEqual(returnedImportedParent.id, parentID)
+        XCTAssertEqual(finalGroupIDs.count, Set(finalGroupIDs).count)
+        XCTAssertEqual(
+            finalSnapshot.allServers.filter { $0.id == creation.serverID }.count,
+            1
+        )
+        XCTAssertEqual(final.serverCredentialBindings[creation.serverID], manualCredentialID)
+        XCTAssertEqual(final.credentialMetadata[manualCredentialID], manualMetadata)
+        XCTAssertNil(final.serverCredentialBindings[importedServerID])
+        XCTAssertNil(final.credentialMetadata[importedCredentialID])
+
         let manualPasswordFingerprint = await passwordStore.passwordFingerprint(
             credentialID: manualCredentialID
         )
@@ -4048,12 +4477,10 @@ final class RdcAppWorkflowTests: XCTestCase {
         )
         let deletedCredentialIDs = await passwordStore.deletedCredentialIDs()
         XCTAssertNotNil(manualPasswordFingerprint)
-        XCTAssertNil(persisted.serverCredentialBindings[importedServerID])
-        XCTAssertNil(persisted.credentialMetadata[importedCredentialID])
         XCTAssertNil(importedPasswordFingerprint)
         XCTAssertEqual(deletedCredentialIDs, [importedCredentialID])
-        XCTAssertEqual(model.selectedServerID, creation.serverID)
-        await model.shutdownAndWait()
+        XCTAssertEqual(reloadedModel.selectedServerID, creation.serverID)
+        await reloadedModel.shutdownAndWait()
     }
 
     private func documentWithSensitiveSourceCredential() -> RdcManDocument {

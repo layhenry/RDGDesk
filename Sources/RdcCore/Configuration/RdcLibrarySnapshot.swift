@@ -72,6 +72,7 @@ public struct RdcLibrarySnapshot: Codable, Equatable, Sendable {
 public struct RdcGroupSnapshot: Codable, Equatable, Sendable {
     public var id: String?
     public var sourceFingerprint: String?
+    public var sourceFingerprintSuppressed: Bool?
     public var name: String
     public var isExpanded: Bool?
     public var groups: [RdcGroupSnapshot]
@@ -80,6 +81,7 @@ public struct RdcGroupSnapshot: Codable, Equatable, Sendable {
     init(
         id: String?,
         sourceFingerprint: String?,
+        sourceFingerprintSuppressed: Bool? = nil,
         name: String,
         isExpanded: Bool?,
         groups: [RdcGroupSnapshot],
@@ -87,6 +89,7 @@ public struct RdcGroupSnapshot: Codable, Equatable, Sendable {
     ) {
         self.id = id
         self.sourceFingerprint = sourceFingerprint
+        self.sourceFingerprintSuppressed = sourceFingerprintSuppressed
         self.name = name
         self.isExpanded = isExpanded
         self.groups = groups
@@ -96,6 +99,7 @@ public struct RdcGroupSnapshot: Codable, Equatable, Sendable {
     init(group: RdcGroup) {
         id = nil
         sourceFingerprint = nil
+        sourceFingerprintSuppressed = nil
         name = group.name
         isExpanded = group.isExpanded
         groups = group.groups.map(RdcGroupSnapshot.init(group:))
@@ -130,7 +134,9 @@ public struct RdcGroupSnapshot: Codable, Equatable, Sendable {
         )
         let shouldBackfillSourceFingerprint = copy.id == nil || copy.id == generatedID
         copy.id = copy.id ?? generatedID
-        if copy.sourceFingerprint == nil, shouldBackfillSourceFingerprint {
+        if copy.sourceFingerprint == nil,
+           copy.sourceFingerprintSuppressed != true,
+           shouldBackfillSourceFingerprint {
             copy.sourceFingerprint = generatedSourceFingerprint
         }
 

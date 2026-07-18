@@ -713,6 +713,7 @@ private extension ResourceLibraryEditor {
            !importedFingerprints.groups.contains(fingerprint) {
             guard hasManualDescendant(in: copy) else { return nil }
             copy.sourceFingerprint = nil
+            copy.sourceFingerprintSuppressed = true
         }
         return copy
     }
@@ -748,19 +749,50 @@ private extension ResourceLibraryEditor {
 
         for child in imported.groups where !isTombstoned(child, tombstones: tombstones) {
             if !containsGroup(fingerprint: child.sourceFingerprint, in: mergedRoot) {
+                var occupiedGroupIDs = resources(in: mergedRoot).groupIDs
                 let filtered = filteredImportedSubtree(
                     child,
                     existingRoot: mergedRoot,
                     tombstones: tombstones
                 )
+                let unique = uniquingImportedGroupIDs(
+                    filtered,
+                    occupiedGroupIDs: &occupiedGroupIDs
+                )
                 _ = mutateGroup(&mergedRoot, where: { target in
                     guard target.id == targetID else { return false }
-                    target.groups.append(filtered)
+                    target.groups.append(unique)
                     return true
                 })
             }
             mergeImportedGroup(child, into: &mergedRoot, tombstones: tombstones)
         }
+    }
+
+    static func uniquingImportedGroupIDs(
+        _ group: RdcGroupSnapshot,
+        occupiedGroupIDs: inout Set<String>
+    ) -> RdcGroupSnapshot {
+        var copy = group
+        if let originalID = copy.id, !occupiedGroupIDs.insert(originalID).inserted {
+            let fingerprint = copy.sourceFingerprint ?? originalID
+            var collisionIndex = 0
+            while true {
+                let candidate = StableLibraryID.group(
+                    sourceID: "rdgdesk-imported-group-id-collision-v1",
+                    path: [fingerprint, String(collisionIndex)]
+                )
+                collisionIndex += 1
+                if occupiedGroupIDs.insert(candidate).inserted {
+                    copy.id = candidate
+                    break
+                }
+            }
+        }
+        copy.groups = copy.groups.map {
+            uniquingImportedGroupIDs($0, occupiedGroupIDs: &occupiedGroupIDs)
+        }
+        return copy
     }
 
     static func filteredImportedSubtree(

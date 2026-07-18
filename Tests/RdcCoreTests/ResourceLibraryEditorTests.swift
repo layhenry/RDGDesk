@@ -161,6 +161,69 @@ final class ResourceLibraryEditorTests: XCTestCase {
         XCTAssertEqual(renamedParent.servers.map(\.displayName), ["Imported Server"])
     }
 
+    func testLocalShellSurvivesNormalizationRepeatedReimportAndReturningFingerprint() throws {
+        let original = parentChangeFixture(parentName: "Imported Parent")
+        let parentID = try XCTUnwrap(original.root.groups.first?.id)
+        let originalFingerprint = try XCTUnwrap(
+            original.root.groups.first?.sourceFingerprint
+        )
+        let creation = try ResourceLibraryEditor.createServer(
+            in: original,
+            parentID: parentID,
+            draft: .init(displayName: "Manual", host: "203.0.113.94", port: 3_389)
+        )
+        let absent = parentChangeFixture(parentName: nil)
+        let firstMerge = ResourceLibraryEditor.mergeReimport(
+            existing: creation.snapshot,
+            imported: absent,
+            restoreDeletedItems: false
+        )
+        let persisted = try JSONDecoder().decode(
+            RdcLibrarySnapshot.self,
+            from: JSONEncoder().encode(firstMerge)
+        )
+
+        let normalized = persisted.normalizedStableIdentity()
+        let normalizedShell = try XCTUnwrap(
+            normalized.root.groups.first { $0.id == parentID }
+        )
+        XCTAssertNil(normalizedShell.sourceFingerprint)
+
+        let secondMerge = ResourceLibraryEditor.mergeReimport(
+            existing: normalized,
+            imported: absent,
+            restoreDeletedItems: false
+        )
+        let secondShell = try XCTUnwrap(
+            secondMerge.root.groups.first { $0.id == parentID }
+        )
+        XCTAssertEqual(secondShell.name, "Imported Parent")
+        XCTAssertNil(secondShell.sourceFingerprint)
+        XCTAssertEqual(secondShell.servers.compactMap(\.id), [creation.serverID])
+
+        let returned = ResourceLibraryEditor.mergeReimport(
+            existing: secondMerge,
+            imported: original,
+            restoreDeletedItems: false
+        )
+        let localShell = try XCTUnwrap(
+            returned.root.groups.first { $0.id == parentID && $0.sourceFingerprint == nil }
+        )
+        let returnedImportedParent = try XCTUnwrap(
+            returned.root.groups.first { $0.sourceFingerprint == originalFingerprint }
+        )
+        let groupIDs = returned.makeLibrary().groups.map(\.id)
+
+        XCTAssertEqual(localShell.name, "Imported Parent")
+        XCTAssertEqual(localShell.servers.compactMap(\.id), [creation.serverID])
+        XCTAssertNotEqual(returnedImportedParent.id, parentID)
+        XCTAssertEqual(groupIDs.count, Set(groupIDs).count)
+        XCTAssertEqual(
+            returned.allServers.filter { $0.id == creation.serverID }.count,
+            1
+        )
+    }
+
     func testUpdateServerValidatesAndPreservesIdentity() throws {
         let snapshot = editableFixture()
         let serverID = try XCTUnwrap(snapshot.root.groups[0].servers[0].id)

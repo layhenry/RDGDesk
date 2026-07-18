@@ -1149,39 +1149,81 @@ final class RdcAppModel: ObservableObject {
                 guard previous.lastLibrary == expectedSnapshot else {
                     throw ResourceLibraryOperationError.libraryChanged
                 }
-                let committed = try await model.configurationRepository.update {
-                    configuration -> CommittedServerCreation in
-                    guard configuration.lastLibrary == expectedSnapshot else {
-                        throw ResourceLibraryOperationError.libraryChanged
+                let passwordStore = model.passwordStore
+                let committed: CommittedServerCreation
+                do {
+                    committed = try await model.configurationRepository.updateWithRollback {
+                        configuration -> RdcPreparedConfigurationUpdate<CommittedServerCreation> in
+                        guard configuration.lastLibrary == expectedSnapshot else {
+                            throw ResourceLibraryOperationError.libraryChanged
+                        }
+                        let base: RdcLibrarySnapshot
+                        let destinationID: String
+                        switch destination {
+                        case let .localLibrary(name):
+                            if let hidden = configuration.lastLibrary {
+                                let classification = hidden.normalizedStableIdentity()
+                                if !ResourceLibraryEditor.manualResourceImpact(
+                                    in: classification
+                                ).isEmpty {
+                                    throw ResourceLibraryOperationError
+                                        .hiddenLibraryContainsManualResources
+                                }
+                            }
+                            base = ResourceLibraryEditor.makeLocalLibrary(name: name)
+                            guard let rootID = base.root.id else {
+                                throw ResourceLibraryOperationError.missingLibrary
+                            }
+                            destinationID = rootID
+                        case let .group(id, _):
+                            guard let existing = configuration.lastLibrary else {
+                                throw ResourceLibraryOperationError.missingLibrary
+                            }
+                            base = existing.normalizedStableIdentity()
+                            destinationID = id
+                        }
+                        let creation = try ResourceLibraryEditor.createServer(
+                            in: base, parentID: destinationID, draft: draft
+                        )
+                        let rollbackPasswords: [DeletedPasswordRollback]
+                        switch destination {
+                        case .localLibrary:
+                            let prepared = Self.prepareImportCandidate(
+                                previous: configuration,
+                                snapshot: creation.snapshot
+                            )
+                            rollbackPasswords = try await Self.deletePasswordsBeforeCommit(
+                                credentialIDs: prepared.credentialsToDelete,
+                                passwordStore: passwordStore
+                            )
+                            configuration = prepared.configuration
+                        case .group:
+                            configuration.lastLibrary = creation.snapshot
+                            rollbackPasswords = []
+                        }
+                        let result = CommittedServerCreation(
+                            configuration: configuration,
+                            serverID: creation.serverID
+                        )
+                        return RdcPreparedConfigurationUpdate(
+                            result: result,
+                            rollback: {
+                                let restored = await Self.restoreDeletedPasswords(
+                                    rollbackPasswords,
+                                    passwordStore: passwordStore
+                                )
+                                guard restored else {
+                                    throw RdcConfigurationTransactionError.rollbackFailed
+                                }
+                            }
+                        )
                     }
-                    let base: RdcLibrarySnapshot
-                    let destinationID: String
-                    switch destination {
-                    case let .localLibrary(name):
-                        if let hidden = configuration.lastLibrary,
-                           !ResourceLibraryEditor.manualResourceImpact(in: hidden).isEmpty {
-                            throw ResourceLibraryOperationError.hiddenLibraryContainsManualResources
-                        }
-                        base = ResourceLibraryEditor.makeLocalLibrary(name: name)
-                        guard let rootID = base.root.id else {
-                            throw ResourceLibraryOperationError.missingLibrary
-                        }
-                        destinationID = rootID
-                    case let .group(id, _):
-                        guard let existing = configuration.lastLibrary else {
-                            throw ResourceLibraryOperationError.missingLibrary
-                        }
-                        base = existing.normalizedStableIdentity()
-                        destinationID = id
-                    }
-                    let creation = try ResourceLibraryEditor.createServer(
-                        in: base, parentID: destinationID, draft: draft
-                    )
-                    configuration.lastLibrary = creation.snapshot
-                    return CommittedServerCreation(
-                        configuration: configuration,
-                        serverID: creation.serverID
-                    )
+                } catch let error as ResourceLibraryOperationError {
+                    throw error
+                } catch RdcConfigurationTransactionError.rollbackFailed {
+                    throw ResourceLibraryOperationError.passwordRollbackFailed
+                } catch {
+                    throw ResourceLibraryOperationError.configurationSaveFailed
                 }
                 model.publishResourceConfiguration(
                     committed.configuration, selectedServerID: committed.serverID

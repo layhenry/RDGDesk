@@ -68,6 +68,68 @@ final class RdcLibrarySnapshotTests: XCTestCase {
         XCTAssertNil(normalized.root.groups.last?.sourceFingerprint)
     }
 
+    func testSuppressedImportedGroupRoundTripStaysLocalAfterNormalization() throws {
+        let original = RdcLibrarySnapshot(
+            sourceID: "durable-shell-source",
+            sourceName: "durable-shell.rdg",
+            document: RdcManDocument(
+                programVersion: "2.7",
+                schemaVersion: "3",
+                root: RdcGroup(
+                    name: "Root",
+                    isExpanded: true,
+                    logonCredentials: nil,
+                    groups: [RdcGroup(
+                        name: "Imported Parent",
+                        isExpanded: true,
+                        logonCredentials: nil,
+                        groups: [],
+                        servers: []
+                    )],
+                    servers: []
+                )
+            )
+        )
+        let parentID = try XCTUnwrap(original.root.groups.first?.id)
+        let withManualServer = try ResourceLibraryEditor.createServer(
+            in: original,
+            parentID: parentID,
+            draft: .init(displayName: "Manual", host: "192.0.2.94", port: 3_389)
+        ).snapshot
+        let absentUpstream = RdcLibrarySnapshot(
+            sourceID: original.sourceID,
+            sourceName: original.sourceName,
+            document: RdcManDocument(
+                programVersion: "2.7",
+                schemaVersion: "3",
+                root: RdcGroup(
+                    name: "Root",
+                    isExpanded: true,
+                    logonCredentials: nil,
+                    groups: [],
+                    servers: []
+                )
+            )
+        )
+        let detached = ResourceLibraryEditor.mergeReimport(
+            existing: withManualServer,
+            imported: absentUpstream,
+            restoreDeletedItems: false
+        )
+
+        let encoded = try JSONEncoder().encode(detached)
+        let encodedText = try XCTUnwrap(String(data: encoded, encoding: .utf8))
+        let decoded = try JSONDecoder().decode(RdcLibrarySnapshot.self, from: encoded)
+        let normalized = decoded.normalizedStableIdentity()
+        let shell = try XCTUnwrap(normalized.root.groups.first { $0.id == parentID })
+
+        XCTAssertTrue(encodedText.contains(#""sourceFingerprintSuppressed":true"#))
+        XCTAssertEqual(shell.id, parentID)
+        XCTAssertEqual(shell.name, "Imported Parent")
+        XCTAssertNil(shell.sourceFingerprint)
+        XCTAssertEqual(shell.servers.compactMap(\.id), withManualServer.allServers.compactMap(\.id))
+    }
+
     func testLegacyBracketedIPv6UsesFrozenStableIDAddressSemantics() throws {
         let sourceID = "legacy-ipv6"
         let rawAddress = "[2001:db8::1]:3390"
