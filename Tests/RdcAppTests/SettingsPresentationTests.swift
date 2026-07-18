@@ -220,6 +220,162 @@ final class SettingsPresentationTests: XCTestCase {
         XCTAssertFalse(coordinator.dismissNewChildGroup(old))
     }
 
+    func testNewServerPresentationIsSingleOwnerAndMutuallyExclusive() throws {
+        let coordinator = ResourcePropertySheetCoordinator()
+        let leaseA = coordinator.register(host: .primaryWindow(id: UUID()))
+        let leaseB = coordinator.register(host: .primaryWindow(id: UUID()))
+        let request = NewServerRequest(
+            targetGroupID: nil,
+            targetGroupName: "我的服务器",
+            expectedSnapshot: nil,
+            ownerLease: leaseA
+        )
+        XCTAssertEqual(coordinator.claimNewServer(request, lease: leaseB), .ownedByAnotherWindow)
+        XCTAssertEqual(coordinator.claimNewServer(request, lease: leaseA), .claimed)
+        XCTAssertEqual(coordinator.claimNewServer(request, lease: leaseA), .alreadyOwned)
+        let presentation = try XCTUnwrap(
+            coordinator.newServerPresentation(requested: request, lease: leaseA)
+        )
+        XCTAssertNil(coordinator.newServerPresentation(requested: request, lease: leaseB))
+        XCTAssertEqual(coordinator.claimNewServer(
+            NewServerRequest(
+                targetGroupID: "another-group",
+                targetGroupName: "另一个群组",
+                expectedSnapshot: nil,
+                ownerLease: leaseA
+            ),
+            lease: leaseA
+        ), .waitingForCurrentDismissal)
+        XCTAssertEqual(coordinator.claimNewChildGroup(
+            NewChildGroupRequest(parentID: "root", parentName: "Root", ownerLease: leaseA),
+            lease: leaseA
+        ), .blockedByCredentialEditor)
+        XCTAssertTrue(coordinator.hasActivePresentation)
+        XCTAssertTrue(coordinator.dismissNewServer(presentation))
+        XCTAssertFalse(coordinator.hasActivePresentation)
+        XCTAssertFalse(coordinator.dismissNewServer(presentation))
+    }
+
+    func testNewServerPresentationBlocksEveryExistingClaimAndUnregisterReleasesIt() throws {
+        let coordinator = ResourcePropertySheetCoordinator()
+        let leaseA = coordinator.register(host: .primaryWindow(id: UUID()))
+        let leaseB = coordinator.register(host: .primaryWindow(id: UUID()))
+        let request = NewServerRequest(
+            targetGroupID: nil,
+            targetGroupName: "我的服务器",
+            expectedSnapshot: nil,
+            ownerLease: leaseA
+        )
+        XCTAssertEqual(coordinator.claimNewServer(request, lease: leaseA), .claimed)
+        let presentation = try XCTUnwrap(
+            coordinator.newServerPresentation(requested: request, lease: leaseA)
+        )
+
+        XCTAssertEqual(coordinator.claimPresentation(
+            route: .server(id: "server-a"), lease: leaseA, activeCredential: nil,
+            isOneTimeCredentialPromptRequested: false
+        ), .waitingForCurrentDismissal)
+        XCTAssertEqual(coordinator.claimPresentation(
+            route: .server(id: "server-b"), lease: leaseB, activeCredential: nil,
+            isOneTimeCredentialPromptRequested: false
+        ), .ownedByAnotherWindow)
+        XCTAssertNil(coordinator.claimOneTimeCredentialPrompt(
+            lease: leaseA, requested: true, activeCredential: nil
+        ))
+        XCTAssertEqual(coordinator.claimDeletion(
+            .server(
+                id: "server-a", name: "A",
+                impact: .init(groupCount: 0, serverCount: 1, containsSelectedServer: false),
+                expectedSnapshot: deletionSnapshotFixture(), ownerLease: leaseA
+            ),
+            lease: leaseA
+        ), .blockedByCredentialEditor)
+        XCTAssertEqual(coordinator.claimNewChildGroup(
+            NewChildGroupRequest(parentID: "root", parentName: "Root", ownerLease: leaseA),
+            lease: leaseA
+        ), .blockedByCredentialEditor)
+        XCTAssertEqual(coordinator.claimSharedModal(
+            kind: .importer, lease: leaseA, activeCredential: nil
+        ), .waitingForCurrentDismissal)
+
+        _ = coordinator.unregister(lease: leaseA)
+        XCTAssertFalse(coordinator.hasActivePresentation)
+        XCTAssertNil(coordinator.newServerPresentation(requested: request, lease: leaseA))
+        XCTAssertFalse(coordinator.dismissNewServer(presentation))
+        XCTAssertEqual(coordinator.claimPresentation(
+            route: .server(id: "server-b"), lease: leaseB, activeCredential: nil,
+            isOneTimeCredentialPromptRequested: false
+        ), .claimed)
+    }
+
+    func testNewServerPresentationIsBlockedByEveryExistingPresentationKind() throws {
+        let coordinator = ResourcePropertySheetCoordinator()
+        let lease = coordinator.register(host: .primaryWindow(id: UUID()))
+        let request = NewServerRequest(
+            targetGroupID: nil,
+            targetGroupName: "我的服务器",
+            expectedSnapshot: nil,
+            ownerLease: lease
+        )
+        let credential = CredentialEditorPresentation(scope: .global, host: .primaryWindow(id: UUID()))
+
+        XCTAssertEqual(coordinator.claimNewServer(
+            request, lease: lease, activeCredential: credential
+        ), .blockedByCredentialEditor)
+        XCTAssertEqual(coordinator.claimNewServer(
+            request, lease: lease, isOneTimeCredentialPromptRequested: true
+        ), .blockedByCredentialEditor)
+
+        XCTAssertEqual(coordinator.claimPresentation(
+            route: .server(id: "server-a"), lease: lease, activeCredential: nil,
+            isOneTimeCredentialPromptRequested: false
+        ), .claimed)
+        let resource = try XCTUnwrap(coordinator.resourcePresentation(
+            requestedRoute: .server(id: "server-a"), lease: lease
+        ))
+        XCTAssertEqual(coordinator.claimNewServer(request, lease: lease), .blockedByCredentialEditor)
+        XCTAssertNil(coordinator.completeResourceDismissal(
+            presentation: resource, activeCredential: nil,
+            isOneTimeCredentialPromptRequested: false
+        ))
+
+        let oneTime = try XCTUnwrap(coordinator.claimOneTimeCredentialPrompt(
+            lease: lease, requested: true, activeCredential: nil
+        ))
+        XCTAssertEqual(coordinator.claimNewServer(request, lease: lease), .blockedByCredentialEditor)
+        XCTAssertTrue(coordinator.dismissOneTimeCredentialPrompt(oneTime))
+
+        let deletion = PendingResourceDeletion.server(
+            id: "server-a", name: "A",
+            impact: .init(groupCount: 0, serverCount: 1, containsSelectedServer: false),
+            expectedSnapshot: deletionSnapshotFixture(), ownerLease: lease
+        )
+        XCTAssertEqual(coordinator.claimDeletion(deletion, lease: lease), .claimed)
+        let deletionPresentation = try XCTUnwrap(coordinator.deletionPresentation(
+            requested: deletion, lease: lease
+        ))
+        XCTAssertEqual(coordinator.claimNewServer(request, lease: lease), .blockedByCredentialEditor)
+        XCTAssertTrue(coordinator.dismissDeletion(deletionPresentation))
+
+        let child = NewChildGroupRequest(
+            parentID: "root", parentName: "Root", ownerLease: lease
+        )
+        XCTAssertEqual(coordinator.claimNewChildGroup(child, lease: lease), .claimed)
+        let childPresentation = try XCTUnwrap(coordinator.newChildGroupPresentation(
+            requested: child, lease: lease
+        ))
+        XCTAssertEqual(coordinator.claimNewServer(request, lease: lease), .blockedByCredentialEditor)
+        XCTAssertTrue(coordinator.dismissNewChildGroup(childPresentation))
+
+        XCTAssertEqual(coordinator.claimSharedModal(
+            kind: .importer, lease: lease, activeCredential: nil
+        ), .claimed)
+        XCTAssertEqual(
+            coordinator.claimNewServer(request, lease: lease),
+            .waitingForCurrentDismissal
+        )
+    }
+
     func testDeletionDialogDismissesDuringOperationThenRePresentsFailure() throws {
         let coordinator = ResourcePropertySheetCoordinator()
         let lease = coordinator.register(host: .primaryWindow(id: UUID()))

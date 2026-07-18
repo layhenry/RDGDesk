@@ -55,6 +55,12 @@ final class ResourcePropertySheetCoordinator: ObservableObject {
         let id = UUID()
     }
 
+    struct NewServerPresentation: Identifiable, Equatable {
+        let request: NewServerRequest
+        let lease: HostLease
+        let id = UUID()
+    }
+
     enum SharedModalKind: Equatable {
         case importer
         case certificate(attemptID: UUID, challengeID: UInt64)
@@ -75,6 +81,7 @@ final class ResourcePropertySheetCoordinator: ObservableObject {
     private var activeOneTimeCredentialPresentation: OneTimeCredentialPresentation?
     private var activeDeletionPresentation: DeletionPresentation?
     private var activeNewChildGroupPresentation: NewChildGroupPresentation?
+    private var activeNewServerPresentation: NewServerPresentation?
     private var activeSharedModalPresentation: SharedModalPresentation?
     private var registeredLeases: [HostLease] = []
     private var savePresentations: [SaveToken: ResourcePresentation] = [:]
@@ -89,6 +96,7 @@ final class ResourcePropertySheetCoordinator: ObservableObject {
         hasActiveResourcePresentation || activeOneTimeCredentialPresentation != nil
             || activeDeletionPresentation != nil
             || activeNewChildGroupPresentation != nil
+            || activeNewServerPresentation != nil
             || activeSharedModalPresentation != nil
     }
 
@@ -137,12 +145,17 @@ final class ResourcePropertySheetCoordinator: ObservableObject {
             return activeNewChildGroupPresentation.lease == lease
                 ? .waitingForCurrentDismissal : .ownedByAnotherWindow
         }
+        if let activeNewServerPresentation {
+            return activeNewServerPresentation.lease == lease
+                ? .waitingForCurrentDismissal : .ownedByAnotherWindow
+        }
         if activeResourcePresentation?.route == route {
             return .alreadyOwned
         }
         guard activeCredential == nil,
               !isOneTimeCredentialPromptRequested,
-              activeOneTimeCredentialPresentation == nil else {
+              activeOneTimeCredentialPresentation == nil,
+              activeNewServerPresentation == nil else {
             return .blockedByCredentialEditor
         }
         // Keep the route SwiftUI actually presented until its onDismiss fires.
@@ -198,7 +211,8 @@ final class ResourcePropertySheetCoordinator: ObservableObject {
               activeSharedModalPresentation == nil,
               !hasActiveResourcePresentation,
               activeDeletionPresentation == nil,
-              activeNewChildGroupPresentation == nil else { return nil }
+              activeNewChildGroupPresentation == nil,
+              activeNewServerPresentation == nil else { return nil }
         if let activeOneTimeCredentialPresentation {
             return activeOneTimeCredentialPresentation.lease == lease
                 ? activeOneTimeCredentialPresentation
@@ -325,7 +339,8 @@ final class ResourcePropertySheetCoordinator: ObservableObject {
               !isOneTimeCredentialPromptRequested,
               activeResourcePresentation == nil,
               activeOneTimeCredentialPresentation == nil,
-              activeNewChildGroupPresentation == nil else {
+              activeNewChildGroupPresentation == nil,
+              activeNewServerPresentation == nil else {
             return .blockedByCredentialEditor
         }
         activeDeletionPresentation = DeletionPresentation(request: request, lease: lease)
@@ -419,7 +434,8 @@ final class ResourcePropertySheetCoordinator: ObservableObject {
               !isOneTimeCredentialPromptRequested,
               activeResourcePresentation == nil,
               activeOneTimeCredentialPresentation == nil,
-              activeDeletionPresentation == nil else {
+              activeDeletionPresentation == nil,
+              activeNewServerPresentation == nil else {
             return .blockedByCredentialEditor
         }
         activeNewChildGroupPresentation = NewChildGroupPresentation(
@@ -449,6 +465,54 @@ final class ResourcePropertySheetCoordinator: ObservableObject {
         return true
     }
 
+    func claimNewServer(
+        _ request: NewServerRequest,
+        lease: HostLease,
+        activeCredential: CredentialEditorPresentation? = nil,
+        isOneTimeCredentialPromptRequested: Bool = false
+    ) -> PresentationClaim {
+        guard isActive(lease) else { return .hostInactive }
+        if let activeSharedModalPresentation {
+            return activeSharedModalPresentation.lease == lease
+                ? .waitingForCurrentDismissal : .ownedByAnotherWindow
+        }
+        guard request.ownerLease == lease else { return .ownedByAnotherWindow }
+        if let activeNewServerPresentation {
+            if activeNewServerPresentation.lease != lease { return .ownedByAnotherWindow }
+            return activeNewServerPresentation.request == request
+                ? .alreadyOwned : .waitingForCurrentDismissal
+        }
+        guard activeCredential == nil,
+              !isOneTimeCredentialPromptRequested,
+              activeResourcePresentation == nil,
+              activeOneTimeCredentialPresentation == nil,
+              activeDeletionPresentation == nil,
+              activeNewChildGroupPresentation == nil else {
+            return .blockedByCredentialEditor
+        }
+        activeNewServerPresentation = NewServerPresentation(request: request, lease: lease)
+        revision &+= 1
+        return .claimed
+    }
+
+    func newServerPresentation(
+        requested: NewServerRequest?,
+        lease: HostLease
+    ) -> NewServerPresentation? {
+        guard isActive(lease), let requested, let activeNewServerPresentation,
+              activeNewServerPresentation.lease == lease,
+              activeNewServerPresentation.request == requested else { return nil }
+        return activeNewServerPresentation
+    }
+
+    @discardableResult
+    func dismissNewServer(_ presentation: NewServerPresentation) -> Bool {
+        guard activeNewServerPresentation == presentation else { return false }
+        activeNewServerPresentation = nil
+        revision &+= 1
+        return true
+    }
+
     func claimSharedModal(
         kind: SharedModalKind,
         lease: HostLease,
@@ -464,7 +528,8 @@ final class ResourcePropertySheetCoordinator: ObservableObject {
               activeResourcePresentation == nil,
               activeOneTimeCredentialPresentation == nil,
               activeDeletionPresentation == nil,
-              activeNewChildGroupPresentation == nil else {
+              activeNewChildGroupPresentation == nil,
+              activeNewServerPresentation == nil else {
             return .waitingForCurrentDismissal
         }
         activeSharedModalPresentation = SharedModalPresentation(kind: kind, lease: lease)
@@ -515,6 +580,9 @@ final class ResourcePropertySheetCoordinator: ObservableObject {
         deletionPresentations = deletionPresentations.filter { $0.value.lease != lease }
         if activeNewChildGroupPresentation?.lease == lease {
             activeNewChildGroupPresentation = nil
+        }
+        if activeNewServerPresentation?.lease == lease {
+            activeNewServerPresentation = nil
         }
         if activeSharedModalPresentation?.lease == lease {
             activeSharedModalPresentation = nil

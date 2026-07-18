@@ -761,6 +761,62 @@ final class RdcAppWorkflowTests: XCTestCase {
         await model.shutdownAndWait()
     }
 
+    func testModelNewServerRequestCapturesExactSnapshotAndLease() async throws {
+        let snapshot = RdcLibrarySnapshot(
+            sourceID: "new-server-request", sourceName: "example.rdg", document: testDocument()
+        )
+        let model = makeModel(
+            configuration: RdcAppConfiguration(lastLibrary: snapshot),
+            engine: AppRecordingSessionEngine()
+        )
+        await model.loadPersistedState()
+        let lease = model.resourcePropertyCoordinator.register(host: .primaryWindow(id: UUID()))
+        let rootID = try XCTUnwrap(snapshot.root.id)
+        XCTAssertTrue(model.requestNewServer(
+            targetGroupID: rootID,
+            targetGroupName: snapshot.root.name,
+            ownerLease: lease
+        ))
+        XCTAssertEqual(model.newServerRequest?.expectedSnapshot, snapshot)
+        XCTAssertEqual(model.newServerRequest?.targetGroupID, rootID)
+        XCTAssertEqual(model.newServerRequest?.ownerLease, lease)
+        model.releaseResourcePresentationRequests(ownedBy: lease)
+        XCTAssertNil(model.newServerRequest)
+        await model.shutdownAndWait()
+    }
+
+    func testModelNewServerRequestValidatesTargetAndOnlyMatchingLeaseClearsIt() async throws {
+        let snapshot = RdcLibrarySnapshot(
+            sourceID: "new-server-validation", sourceName: "example.rdg", document: testDocument()
+        )
+        let model = makeModel(
+            configuration: RdcAppConfiguration(lastLibrary: snapshot),
+            engine: AppRecordingSessionEngine()
+        )
+        await model.loadPersistedState()
+        let leaseA = model.resourcePropertyCoordinator.register(host: .primaryWindow(id: UUID()))
+        let leaseB = model.resourcePropertyCoordinator.register(host: .primaryWindow(id: UUID()))
+
+        XCTAssertFalse(model.requestNewServer(
+            targetGroupID: "missing-group", targetGroupName: "Missing", ownerLease: leaseA
+        ))
+        XCTAssertNil(model.newServerRequest)
+        XCTAssertTrue(model.requestNewServer(
+            targetGroupID: nil, targetGroupName: "我的服务器", ownerLease: leaseA
+        ))
+        let request = try XCTUnwrap(model.newServerRequest)
+        XCTAssertEqual(request.expectedSnapshot, snapshot)
+        model.releaseResourcePresentationRequests(ownedBy: leaseB)
+        XCTAssertEqual(model.newServerRequest, request)
+        model.resourcePropertyCoordinator.unregister(lease: leaseA)
+        XCTAssertFalse(model.requestNewServer(
+            targetGroupID: nil, targetGroupName: "我的服务器", ownerLease: leaseA
+        ))
+        model.releaseResourcePresentationRequests(ownedBy: leaseA)
+        XCTAssertNil(model.newServerRequest)
+        await model.shutdownAndWait()
+    }
+
     func testCompletedOldDeletionDoesNotClearNewerConfirmationRequest() async throws {
         let snapshot = RdcLibrarySnapshot(
             sourceID: "rapid-confirm-delete", sourceName: "example.rdg",

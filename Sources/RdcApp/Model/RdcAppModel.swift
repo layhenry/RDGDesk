@@ -249,6 +249,7 @@ final class RdcAppModel: ObservableObject {
     @Published private(set) var resourceEditorOwnerLease: ResourcePropertySheetCoordinator.HostLease?
     @Published var pendingResourceDeletion: PendingResourceDeletion?
     @Published var newChildGroupRequest: NewChildGroupRequest?
+    @Published var newServerRequest: NewServerRequest?
     @Published var resourceOperationMessage: String?
     @Published private(set) var deletedImportRestoreCount: Int?
     @Published private(set) var activeSessionServerID: String?
@@ -1189,6 +1190,26 @@ final class RdcAppModel: ObservableObject {
         return true
     }
 
+    @discardableResult
+    func requestNewServer(
+        targetGroupID: String?,
+        targetGroupName: String,
+        ownerLease: ResourcePropertySheetCoordinator.HostLease
+    ) -> Bool {
+        guard resourcePropertyCoordinator.isActiveLease(ownerLease) else { return false }
+        if let targetGroupID,
+           library?.groups.contains(where: { $0.id == targetGroupID }) != true {
+            return false
+        }
+        newServerRequest = NewServerRequest(
+            targetGroupID: targetGroupID,
+            targetGroupName: targetGroupName,
+            expectedSnapshot: configuration.lastLibrary,
+            ownerLease: ownerLease
+        )
+        return true
+    }
+
     private func dismissResourceEditor(
         ownedBy ownerLease: ResourcePropertySheetCoordinator.HostLease
     ) {
@@ -1229,6 +1250,9 @@ final class RdcAppModel: ObservableObject {
         }
         if newChildGroupRequest?.ownerLease == lease {
             newChildGroupRequest = nil
+        }
+        if newServerRequest?.ownerLease == lease {
+            newServerRequest = nil
         }
     }
 
