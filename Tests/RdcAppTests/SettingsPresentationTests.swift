@@ -1828,9 +1828,9 @@ final class SettingsPresentationTests: XCTestCase {
         XCTAssertTrue(editor.canSave)
 
         editor.updateName("生产服务器")
-        editor.updateHost("106.54.202.171")
+        editor.updateHost("192.0.2.171")
         XCTAssertEqual(editor.name, "生产服务器")
-        XCTAssertEqual(editor.draft?.host, "106.54.202.171")
+        XCTAssertEqual(editor.draft?.host, "192.0.2.171")
     }
 
     func testNewServerEditorExposesFieldErrorsAndKeepsInputAfterSaveFailure() async {
