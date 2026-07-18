@@ -197,6 +197,20 @@ struct PendingResourceDeletion: Equatable {
     }
 }
 
+struct PendingLibraryReplacement: Identifiable {
+    let id = UUID()
+    let document: RdcManDocument
+    let sourceName: String
+    let sourceIdentity: String?
+    let sourceLocatorAliases: Set<String>
+    let expectedSnapshot: RdcLibrarySnapshot
+    let impact: ManualResourceImpact
+
+    var message: String {
+        "当前资源库包含 \(impact.groupCount) 个手动分组和 \(impact.serverCount) 台手动服务器。继续将替换这些本地内容。"
+    }
+}
+
 enum ResourceLibraryOperationError: Error, Equatable {
     case missingLibrary
     case libraryChanged
@@ -248,6 +262,7 @@ final class RdcAppModel: ObservableObject {
     @Published var resourceEditorRoute: ResourceEditorRoute?
     @Published private(set) var resourceEditorOwnerLease: ResourcePropertySheetCoordinator.HostLease?
     @Published var pendingResourceDeletion: PendingResourceDeletion?
+    @Published private(set) var pendingLibraryReplacement: PendingLibraryReplacement?
     @Published var newChildGroupRequest: NewChildGroupRequest?
     @Published var newServerRequest: NewServerRequest?
     @Published var resourceOperationMessage: String?
@@ -729,14 +744,73 @@ final class RdcAppModel: ObservableObject {
         sourceLocatorAliases: Set<String> = [],
         restoreDeletedItems: Bool = false
     ) async {
+        do {
+            let current = try await configurationRepository.snapshot()
+            if let persisted = current.lastLibrary {
+                let existing = persisted.normalizedStableIdentity()
+                let locatorFingerprint = sourceIdentity.map(
+                    StableLibraryID.sourceLocatorFingerprint(for:)
+                )
+                var locatorAliases = sourceLocatorAliases
+                if let locatorFingerprint { locatorAliases.insert(locatorFingerprint) }
+                let compatibilityImport = RdcLibrarySnapshot(
+                    sourceID: existing.sourceID,
+                    sourceName: sourceName,
+                    sourceLocatorFingerprint: locatorFingerprint,
+                    sourceLocatorAliases: locatorAliases,
+                    document: document
+                )
+                let sameSource = try Self.isSameImportSource(
+                    existing: existing,
+                    compatibilityImport: compatibilityImport,
+                    sourceName: sourceName,
+                    providedLocatorAliases: sourceLocatorAliases,
+                    locatorAliases: locatorAliases
+                )
+                let impact = ResourceLibraryEditor.manualResourceImpact(in: existing)
+                if !sameSource, !impact.isEmpty {
+                    pendingLibraryReplacement = PendingLibraryReplacement(
+                        document: document,
+                        sourceName: sourceName,
+                        sourceIdentity: sourceIdentity,
+                        sourceLocatorAliases: sourceLocatorAliases,
+                        expectedSnapshot: persisted,
+                        impact: impact
+                    )
+                    return
+                }
+            }
+            pendingLibraryReplacement = nil
+            _ = await performLibraryImport(
+                document: document,
+                sourceName: sourceName,
+                sourceIdentity: sourceIdentity,
+                sourceLocatorAliases: sourceLocatorAliases,
+                restoreDeletedItems: restoreDeletedItems,
+                expectedRestoreSnapshot: nil
+            )
+        } catch let error as ResourceLibraryOperationError {
+            importError = error.safeMessage
+        } catch {
+            importError = "无法读取当前资源库状态，请重试。"
+        }
+    }
+
+    func confirmLibraryReplacement(_ pending: PendingLibraryReplacement) async {
+        if let current = pendingLibraryReplacement, current.id != pending.id { return }
+        pendingLibraryReplacement = nil
         _ = await performLibraryImport(
-            document: document,
-            sourceName: sourceName,
-            sourceIdentity: sourceIdentity,
-            sourceLocatorAliases: sourceLocatorAliases,
-            restoreDeletedItems: restoreDeletedItems,
-            expectedRestoreSnapshot: nil
+            document: pending.document,
+            sourceName: pending.sourceName,
+            sourceIdentity: pending.sourceIdentity,
+            sourceLocatorAliases: pending.sourceLocatorAliases,
+            restoreDeletedItems: false,
+            expectedRestoreSnapshot: pending.expectedSnapshot
         )
+    }
+
+    func cancelLibraryReplacement() {
+        pendingLibraryReplacement = nil
     }
 
     @discardableResult
@@ -777,33 +851,19 @@ final class RdcAppModel: ObservableObject {
                         document: document
                     )
                     let isSameSource: Bool
-                    let existingAliases = Set(existing?.sourceLocatorAliases ?? [])
-                        .union(existing?.sourceLocatorFingerprint.map { [$0] } ?? [])
-                    if let existing,
-                       existing.sourceLocatorAliases.isEmpty,
-                       existing.sourceLocatorFingerprint != nil,
-                       existing.sourceName == sourceName,
-                       sourceLocatorAliases.contains(where: { $0.hasPrefix("path-hash:") }),
-                       !locatorAliases.isEmpty,
-                       existingAliases.isDisjoint(with: locatorAliases) {
-                        throw ResourceLibraryOperationError.sourceIdentityMigrationRequired
-                    }
-                    if !existingAliases.isEmpty {
-                        // Once a stable file identity is persisted, never weaken it to
-                        // a filename- or content-only association. A missing incoming
-                        // identity therefore means a different source.
-                        isSameSource = !locatorAliases.isEmpty
-                            && !existingAliases.isDisjoint(with: locatorAliases)
-                    } else if let existing, locatorAliases.isEmpty {
-                        // Legacy snapshots can be associated only when their complete
-                        // source-fingerprint sets prove identical source content.
-                        isSameSource = Self.hasExactSourceFingerprintCompatibility(
+                    if let existing {
+                        isSameSource = try Self.isSameImportSource(
                             existing: existing,
-                            imported: compatibilityImport
+                            compatibilityImport: compatibilityImport,
+                            sourceName: sourceName,
+                            providedLocatorAliases: sourceLocatorAliases,
+                            locatorAliases: locatorAliases
                         )
                     } else {
                         isSameSource = false
                     }
+                    let existingAliases = Set(existing?.sourceLocatorAliases ?? [])
+                        .union(existing?.sourceLocatorFingerprint.map { [$0] } ?? [])
                     let imported = RdcLibrarySnapshot(
                         sourceID: isSameSource
                             ? existing?.sourceID ?? UUID().uuidString
@@ -997,6 +1057,37 @@ final class RdcAppModel: ObservableObject {
         existingFingerprints.formUnion(existing.deletedSourceItems)
         let importedFingerprints = sourceFingerprintSet(in: imported.root)
         return !existingFingerprints.isEmpty && existingFingerprints == importedFingerprints
+    }
+
+    nonisolated private static func isSameImportSource(
+        existing: RdcLibrarySnapshot,
+        compatibilityImport: RdcLibrarySnapshot,
+        sourceName: String,
+        providedLocatorAliases: Set<String>,
+        locatorAliases: Set<String>
+    ) throws -> Bool {
+        let existingAliases = existing.sourceLocatorAliases.union(
+            existing.sourceLocatorFingerprint.map { [$0] } ?? []
+        )
+        if existing.sourceLocatorAliases.isEmpty,
+           existing.sourceLocatorFingerprint != nil,
+           existing.sourceName == sourceName,
+           providedLocatorAliases.contains(where: { $0.hasPrefix("path-hash:") }),
+           !locatorAliases.isEmpty,
+           existingAliases.isDisjoint(with: locatorAliases) {
+            throw ResourceLibraryOperationError.sourceIdentityMigrationRequired
+        }
+        if !existingAliases.isEmpty {
+            return !locatorAliases.isEmpty
+                && !existingAliases.isDisjoint(with: locatorAliases)
+        }
+        if locatorAliases.isEmpty {
+            return hasExactSourceFingerprintCompatibility(
+                existing: existing,
+                imported: compatibilityImport
+            )
+        }
+        return false
     }
 
     nonisolated private static func sourceFingerprintSet(

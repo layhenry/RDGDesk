@@ -1954,11 +1954,12 @@ final class RdcAppWorkflowTests: XCTestCase {
         await model.shutdownAndWait()
     }
 
-    func testImportFromDifferentSourceReplacesInsteadOfMergingLocalResources() async throws {
+    func testDifferentSourceImportRequiresConfirmationWhenManualResourcesExist() async throws {
         let original = RdcLibrarySnapshot(
-            sourceID: "source-a", sourceName: "example.rdg",
+            sourceID: "source-a",
+            sourceName: "first.rdg",
             sourceLocatorFingerprint: StableLibraryID.sourceLocatorFingerprint(
-                for: "file:///Library-A/example.rdg"
+                for: "file:///Library-A/first.rdg"
             ),
             document: reimportWorkflowDocument(includeNewServer: false)
         )
@@ -1968,18 +1969,45 @@ final class RdcAppWorkflowTests: XCTestCase {
         )
         await model.loadPersistedState()
         let rootID = try XCTUnwrap(original.root.id)
-        try await model.createChildGroup(parentID: rootID, name: "Mac 专用")
+        _ = try await model.createServer(
+            targetGroupID: rootID,
+            expectedSnapshot: original,
+            draft: .init(displayName: "Manual", host: "192.0.2.20", port: 3_389)
+        )
+        let beforeImport = model.configuration.lastLibrary
 
         await model.importLibrary(
             document: testDocument(),
-            sourceName: "example.rdg",
-            sourceIdentity: "file:///Library-B/example.rdg"
+            sourceName: "second.rdg",
+            sourceIdentity: "file:///Library-B/second.rdg"
         )
 
-        XCTAssertNotEqual(model.library?.sourceID, original.sourceID)
-        XCTAssertEqual(model.library?.sourceName, "example.rdg")
-        XCTAssertFalse(model.library?.groups.contains { $0.name == "Mac 专用" } ?? true)
+        XCTAssertEqual(model.configuration.lastLibrary, beforeImport)
+        let replacement = try XCTUnwrap(model.pendingLibraryReplacement)
+        XCTAssertEqual(replacement.impact.serverCount, 1)
+        await model.confirmLibraryReplacement(replacement)
+        XCTAssertNil(model.pendingLibraryReplacement)
+        XCTAssertEqual(model.library?.sourceName, "second.rdg")
         XCTAssertEqual(model.library?.servers.map(\.displayName), ["Server"])
+        await model.shutdownAndWait()
+    }
+
+    func testCancellingDifferentSourceImportKeepsManualLibrary() async throws {
+        let model = makeModel(configuration: .default, engine: AppRecordingSessionEngine())
+        await model.loadPersistedState()
+        _ = try await model.createServer(
+            targetGroupID: nil,
+            expectedSnapshot: nil,
+            draft: .init(displayName: "Manual", host: "192.0.2.30", port: 3_389)
+        )
+        await model.importLibrary(
+            document: testDocument(), sourceName: "imported.rdg",
+            sourceIdentity: "file:///Imported/imported.rdg"
+        )
+        XCTAssertNotNil(model.pendingLibraryReplacement)
+        model.cancelLibraryReplacement()
+        XCTAssertNil(model.pendingLibraryReplacement)
+        XCTAssertEqual(model.library?.servers.map(\.displayName), ["Manual"])
         await model.shutdownAndWait()
     }
 
@@ -1997,7 +2025,9 @@ final class RdcAppWorkflowTests: XCTestCase {
         try await model.createChildGroup(parentID: rootID, name: "Local Only")
 
         await model.importLibrary(document: testDocument(), sourceName: "example.rdg")
-
+        let replacement = try XCTUnwrap(model.pendingLibraryReplacement)
+        XCTAssertEqual(replacement.impact.groupCount, 1)
+        await model.confirmLibraryReplacement(replacement)
         XCTAssertNotEqual(model.library?.sourceID, original.sourceID)
         XCTAssertFalse(model.library?.groups.contains { $0.name == "Local Only" } ?? true)
         XCTAssertEqual(model.library?.servers.map(\.displayName), ["Server"])

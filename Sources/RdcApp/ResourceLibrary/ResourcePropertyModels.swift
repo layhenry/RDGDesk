@@ -63,6 +63,7 @@ final class ResourcePropertySheetCoordinator: ObservableObject {
 
     enum SharedModalKind: Equatable {
         case importer
+        case libraryReplacement
         case certificate(attemptID: UUID, challengeID: UInt64)
         case importError
         case importRestore

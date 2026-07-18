@@ -90,6 +90,23 @@ struct RdcRootView: View {
         ) { result in
             model.handleImportResult(result)
         }
+        .confirmationDialog(
+            "替换当前资源库？",
+            isPresented: sharedBoolBinding(
+                kind: .libraryReplacement,
+                requested: model.pendingLibraryReplacement != nil,
+                dismiss: { model.cancelLibraryReplacement() }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("替换资源库", role: .destructive) {
+                guard let pending = model.pendingLibraryReplacement else { return }
+                Task { await model.confirmLibraryReplacement(pending) }
+            }
+            Button("取消", role: .cancel) { model.cancelLibraryReplacement() }
+        } message: {
+            Text(model.pendingLibraryReplacement?.message ?? "")
+        }
         .alert("导入失败", isPresented: sharedBoolBinding(
             kind: .importError,
             requested: model.importError != nil,
@@ -615,6 +632,7 @@ struct RdcRootView: View {
             return CertificateTrustSheetItem(pending, token: token).sharedModalKind
         }
         if model.isShowingImporter { return .importer }
+        if model.pendingLibraryReplacement != nil { return .libraryReplacement }
         if model.importError != nil { return .importError }
         if model.deletedImportRestoreCount != nil { return .importRestore }
         if model.resourceOperationMessage != nil, model.pendingResourceDeletion == nil {
