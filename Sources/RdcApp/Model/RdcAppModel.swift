@@ -1220,6 +1220,10 @@ final class RdcAppModel: ObservableObject {
                     }
                 } catch let error as ResourceLibraryOperationError {
                     throw error
+                } catch let error as ResourceLibraryEditError {
+                    throw error
+                } catch let error as CancellationError {
+                    throw error
                 } catch RdcConfigurationTransactionError.rollbackFailed {
                     throw ResourceLibraryOperationError.passwordRollbackFailed
                 } catch {

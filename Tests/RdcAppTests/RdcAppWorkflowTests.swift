@@ -773,6 +773,45 @@ final class RdcAppWorkflowTests: XCTestCase {
         await model.shutdownAndWait()
     }
 
+    func testCreateServerPreservesInvalidDraftErrorWithoutSaving() async {
+        let store = AppControlledConfigurationStore(configuration: .default)
+        let model = RdcAppModel(
+            configurationRepository: RdcConfigurationRepository(store: store),
+            passwordStore: AppMemoryPasswordStore(),
+            engine: AppRecordingSessionEngine()
+        )
+        await model.loadPersistedState()
+
+        let error = await captureError {
+            _ = try await model.createServer(
+                destination: .localLibrary(name: "我的服务器"),
+                expectedSnapshot: nil,
+                draft: .init(displayName: "   ", host: "192.0.2.97", port: 3_389)
+            )
+        }
+
+        let persisted = await store.current()
+        let savedCount = await store.savedCount()
+        XCTAssertEqual(error as? ResourceLibraryEditError, .emptyName)
+        XCTAssertNotEqual(
+            error as? ResourceLibraryOperationError,
+            .configurationSaveFailed
+        )
+        XCTAssertEqual(
+            model.resourceOperationMessage,
+            "无法完成资源库操作，请检查输入或目标位置后重试。"
+        )
+        XCTAssertNotEqual(
+            model.resourceOperationMessage,
+            ResourceLibraryOperationError.configurationSaveFailed.safeMessage
+        )
+        XCTAssertEqual(persisted, .default)
+        XCTAssertEqual(model.configuration, .default)
+        XCTAssertNil(model.library)
+        XCTAssertEqual(savedCount, 0)
+        await model.shutdownAndWait()
+    }
+
     func testCreateServerAddsToRequestedGroupAndRejectsStaleSnapshot() async throws {
         let snapshot = RdcLibrarySnapshot(
             sourceID: "manual-target", sourceName: "example.rdg", document: nestedDocument()
