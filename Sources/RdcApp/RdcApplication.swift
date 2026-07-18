@@ -100,7 +100,11 @@ struct RdcRootView: View {
             titleVisibility: .visible
         ) {
             Button("替换资源库", role: .destructive) {
-                guard let pending = model.pendingLibraryReplacement else { return }
+                guard let pending = model.pendingLibraryReplacement,
+                      let lease = credentialEditorLease,
+                      resourcePropertyCoordinator.consumeSharedModalForAction(
+                          kind: .libraryReplacement, lease: lease
+                      ) else { return }
                 Task { await model.confirmLibraryReplacement(pending) }
             }
             Button("取消", role: .cancel) { model.cancelLibraryReplacement() }

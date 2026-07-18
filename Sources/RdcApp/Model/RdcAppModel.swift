@@ -787,7 +787,7 @@ final class RdcAppModel: ObservableObject {
                 sourceIdentity: sourceIdentity,
                 sourceLocatorAliases: sourceLocatorAliases,
                 restoreDeletedItems: restoreDeletedItems,
-                expectedRestoreSnapshot: nil
+                expectedLibrarySnapshot: current.lastLibrary
             )
         } catch let error as ResourceLibraryOperationError {
             importError = error.safeMessage
@@ -797,7 +797,8 @@ final class RdcAppModel: ObservableObject {
     }
 
     func confirmLibraryReplacement(_ pending: PendingLibraryReplacement) async {
-        if let current = pendingLibraryReplacement, current.id != pending.id { return }
+        guard let current = pendingLibraryReplacement,
+              current.id == pending.id else { return }
         pendingLibraryReplacement = nil
         _ = await performLibraryImport(
             document: pending.document,
@@ -805,7 +806,7 @@ final class RdcAppModel: ObservableObject {
             sourceIdentity: pending.sourceIdentity,
             sourceLocatorAliases: pending.sourceLocatorAliases,
             restoreDeletedItems: false,
-            expectedRestoreSnapshot: pending.expectedSnapshot
+            expectedLibrarySnapshot: pending.expectedSnapshot
         )
     }
 
@@ -820,7 +821,7 @@ final class RdcAppModel: ObservableObject {
         sourceIdentity: String?,
         sourceLocatorAliases: Set<String>,
         restoreDeletedItems: Bool,
-        expectedRestoreSnapshot: RdcLibrarySnapshot?
+        expectedLibrarySnapshot: RdcLibrarySnapshot?
     ) async -> Bool {
         var succeeded = false
         await performOperation { model, generation in
@@ -833,8 +834,7 @@ final class RdcAppModel: ObservableObject {
                 let passwordStore = model.passwordStore
                 let committed = try await model.configurationRepository.updateWithRollback {
                     configuration -> RdcPreparedConfigurationUpdate<RdcAppConfiguration> in
-                    if let expectedRestoreSnapshot,
-                       configuration.lastLibrary != expectedRestoreSnapshot {
+                    if configuration.lastLibrary != expectedLibrarySnapshot {
                         throw ResourceLibraryOperationError.confirmationStale
                     }
                     let existing = configuration.lastLibrary?.normalizedStableIdentity()
@@ -967,7 +967,7 @@ final class RdcAppModel: ObservableObject {
             sourceIdentity: pendingDeletedImportRestore.sourceIdentity,
             sourceLocatorAliases: pendingDeletedImportRestore.sourceLocatorAliases,
             restoreDeletedItems: true,
-            expectedRestoreSnapshot: pendingDeletedImportRestore.expectedSnapshot
+            expectedLibrarySnapshot: pendingDeletedImportRestore.expectedSnapshot
         )
         if !restored {
             dismissDeletedItemsRestoreOffer(matching: pendingDeletedImportRestore.token)

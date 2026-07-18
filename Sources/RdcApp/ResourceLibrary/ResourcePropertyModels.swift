@@ -554,6 +554,17 @@ final class ResourcePropertySheetCoordinator: ObservableObject {
     }
 
     @discardableResult
+    func consumeSharedModalForAction(
+        kind: SharedModalKind,
+        lease: HostLease
+    ) -> Bool {
+        guard let presentation = sharedModalPresentation(kind: kind, lease: lease) else {
+            return false
+        }
+        return dismissSharedModal(presentation)
+    }
+
+    @discardableResult
     func dismissSharedModal(_ presentation: SharedModalPresentation) -> Bool {
         guard isActive(presentation.lease),
               activeSharedModalPresentation == presentation else { return false }

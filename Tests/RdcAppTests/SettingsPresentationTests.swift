@@ -431,6 +431,28 @@ final class SettingsPresentationTests: XCTestCase {
         XCTAssertEqual(coordinator.claimNewServer(request, lease: lease), .claimed)
     }
 
+    func testLibraryReplacementActionConsumesModalBeforeAutomaticDismissal() throws {
+        let coordinator = ResourcePropertySheetCoordinator()
+        let lease = coordinator.register(host: .primaryWindow(id: UUID()))
+        XCTAssertEqual(coordinator.claimSharedModal(
+            kind: .libraryReplacement,
+            lease: lease,
+            activeCredential: nil
+        ), .claimed)
+        let captured = try XCTUnwrap(coordinator.sharedModalPresentation(
+            kind: .libraryReplacement, lease: lease
+        ))
+
+        XCTAssertTrue(coordinator.consumeSharedModalForAction(
+            kind: .libraryReplacement, lease: lease
+        ))
+
+        XCTAssertNil(coordinator.sharedModalPresentation(
+            kind: .libraryReplacement, lease: lease
+        ))
+        XCTAssertFalse(coordinator.dismissSharedModal(captured))
+    }
+
     func testDeletionDialogDismissesDuringOperationThenRePresentsFailure() throws {
         let coordinator = ResourcePropertySheetCoordinator()
         let lease = coordinator.register(host: .primaryWindow(id: UUID()))

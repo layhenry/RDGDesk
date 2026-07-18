@@ -2011,6 +2011,70 @@ final class RdcAppWorkflowTests: XCTestCase {
         await model.shutdownAndWait()
     }
 
+    func testCancelledLibraryReplacementCannotBeConfirmedLater() async throws {
+        let engine = AppRecordingSessionEngine()
+        let model = makeModel(configuration: .default, engine: engine)
+        await model.loadPersistedState()
+        _ = try await model.createServer(
+            targetGroupID: nil,
+            expectedSnapshot: nil,
+            draft: .init(displayName: "Manual", host: "192.0.2.31", port: 3_389)
+        )
+        await model.importLibrary(
+            document: testDocument(), sourceName: "imported.rdg",
+            sourceIdentity: "file:///Imported/imported.rdg"
+        )
+        let replacement = try XCTUnwrap(model.pendingLibraryReplacement)
+        try await model.session.connect(
+            server: try XCTUnwrap(model.selectedServer),
+            credential: nil,
+            viewport: .init(width: 800, height: 600)
+        )
+
+        model.cancelLibraryReplacement()
+        await model.confirmLibraryReplacement(replacement)
+
+        XCTAssertNil(model.pendingLibraryReplacement)
+        XCTAssertEqual(model.library?.servers.map(\.displayName), ["Manual"])
+        XCTAssertNotNil(model.session.descriptor)
+        XCTAssertNil(model.importError)
+        let disconnectCount = await engine.disconnectCount()
+        XCTAssertEqual(disconnectCount, 0)
+        await model.shutdownAndWait()
+    }
+
+    func testLibraryReplacementConfirmationCanOnlyBeConsumedOnce() async throws {
+        let engine = AppRecordingSessionEngine()
+        let model = makeModel(configuration: .default, engine: engine)
+        await model.loadPersistedState()
+        _ = try await model.createServer(
+            targetGroupID: nil,
+            expectedSnapshot: nil,
+            draft: .init(displayName: "Manual", host: "192.0.2.32", port: 3_389)
+        )
+        await model.importLibrary(
+            document: testDocument(), sourceName: "imported.rdg",
+            sourceIdentity: "file:///Imported/imported.rdg"
+        )
+        let replacement = try XCTUnwrap(model.pendingLibraryReplacement)
+
+        await model.confirmLibraryReplacement(replacement)
+        try await model.session.connect(
+            server: try XCTUnwrap(model.selectedServer),
+            credential: nil,
+            viewport: .init(width: 800, height: 600)
+        )
+        await model.confirmLibraryReplacement(replacement)
+
+        XCTAssertNil(model.pendingLibraryReplacement)
+        XCTAssertEqual(model.library?.servers.map(\.displayName), ["Server"])
+        XCTAssertNotNil(model.session.descriptor)
+        XCTAssertNil(model.importError)
+        let disconnectCount = await engine.disconnectCount()
+        XCTAssertEqual(disconnectCount, 0)
+        await model.shutdownAndWait()
+    }
+
     func testLegacySameNameWithoutIdentityDoesNotMergeDifferentContentWithSameRoot() async throws {
         let original = RdcLibrarySnapshot(
             sourceID: "legacy-source", sourceName: "example.rdg",
@@ -2383,6 +2447,128 @@ final class RdcAppWorkflowTests: XCTestCase {
             $0.displayName == "Upstream New"
         } ?? false)
         XCTAssertEqual(model.configuration, persisted)
+        await model.shutdownAndWait()
+    }
+
+    func testImportRejectsConcurrentManualLibraryChangeBeforeCommit() async throws {
+        let original = RdcLibrarySnapshot(
+            sourceID: "preflight-source",
+            sourceName: "first.rdg",
+            sourceLocatorFingerprint: StableLibraryID.sourceLocatorFingerprint(
+                for: "file:///Library-A/first.rdg"
+            ),
+            document: testDocument()
+        )
+        let initial = RdcAppConfiguration(lastLibrary: original)
+        let store = AppControlledConfigurationStore(configuration: initial)
+        let repository = RdcConfigurationRepository(store: store)
+        let passwordStore = AppMemoryPasswordStore(passwords: ["manual-credential": "secret"])
+        let engine = AppRecordingSessionEngine()
+        let checkpoint = AppResourceOperationCheckpoint()
+        let model = RdcAppModel(
+            configurationRepository: repository,
+            passwordStore: passwordStore,
+            engine: engine,
+            resourceOperationCheckpoint: { await checkpoint.pause() }
+        )
+        await model.loadPersistedState()
+
+        let importTask = Task { @MainActor in
+            await model.importLibrary(
+                document: nestedDocument(),
+                sourceName: "second.rdg",
+                sourceIdentity: "file:///Library-B/second.rdg"
+            )
+        }
+        await checkpoint.waitUntilPaused()
+        let rootID = try XCTUnwrap(original.root.id)
+        let creation = try ResourceLibraryEditor.createServer(
+            in: original,
+            parentID: rootID,
+            draft: .init(displayName: "Concurrent Manual", host: "192.0.2.40", port: 3_389)
+        )
+        var concurrentCandidate = initial
+        concurrentCandidate.lastLibrary = creation.snapshot
+        concurrentCandidate.serverCredentialBindings[creation.serverID] = "manual-credential"
+        concurrentCandidate.credentialMetadata["manual-credential"] = CredentialMetadata(
+            id: "manual-credential", username: "manual", domain: nil
+        )
+        let concurrent = concurrentCandidate
+        try await repository.update { $0 = concurrent }
+        await checkpoint.resume()
+        await importTask.value
+
+        let persisted = await store.current()
+        let saveCount = await store.savedCount()
+        let passwordFingerprint = await passwordStore.passwordFingerprint(
+            credentialID: "manual-credential"
+        )
+        let deletedIDs = await passwordStore.deletedCredentialIDs()
+        let connectionCount = await engine.capture().connectionCount
+        XCTAssertEqual(persisted, concurrent)
+        XCTAssertEqual(saveCount, 1)
+        XCTAssertNotNil(passwordFingerprint)
+        XCTAssertEqual(deletedIDs, [])
+        XCTAssertEqual(connectionCount, 0)
+        XCTAssertEqual(
+            model.importError,
+            ResourceLibraryOperationError.confirmationStale.safeMessage
+        )
+        await model.shutdownAndWait()
+    }
+
+    func testEmptyPreflightCannotOverwriteConcurrentlyCreatedManualLibrary() async throws {
+        let store = AppControlledConfigurationStore(configuration: .default)
+        let repository = RdcConfigurationRepository(store: store)
+        let passwordStore = AppMemoryPasswordStore(passwords: ["manual-credential": "secret"])
+        let checkpoint = AppResourceOperationCheckpoint()
+        let model = RdcAppModel(
+            configurationRepository: repository,
+            passwordStore: passwordStore,
+            engine: AppRecordingSessionEngine(),
+            resourceOperationCheckpoint: { await checkpoint.pause() }
+        )
+        await model.loadPersistedState()
+
+        let importTask = Task { @MainActor in
+            await model.importLibrary(
+                document: testDocument(),
+                sourceName: "imported.rdg",
+                sourceIdentity: "file:///Imported/imported.rdg"
+            )
+        }
+        await checkpoint.waitUntilPaused()
+        let local = ResourceLibraryEditor.makeLocalLibrary()
+        let rootID = try XCTUnwrap(local.root.id)
+        let creation = try ResourceLibraryEditor.createServer(
+            in: local,
+            parentID: rootID,
+            draft: .init(displayName: "Concurrent Manual", host: "192.0.2.41", port: 3_389)
+        )
+        var concurrentCandidate = RdcAppConfiguration(lastLibrary: creation.snapshot)
+        concurrentCandidate.serverCredentialBindings[creation.serverID] = "manual-credential"
+        concurrentCandidate.credentialMetadata["manual-credential"] = CredentialMetadata(
+            id: "manual-credential", username: "manual", domain: nil
+        )
+        let concurrent = concurrentCandidate
+        try await repository.update { $0 = concurrent }
+        await checkpoint.resume()
+        await importTask.value
+
+        let persisted = await store.current()
+        let saveCount = await store.savedCount()
+        let passwordFingerprint = await passwordStore.passwordFingerprint(
+            credentialID: "manual-credential"
+        )
+        let deletedIDs = await passwordStore.deletedCredentialIDs()
+        XCTAssertEqual(persisted, concurrent)
+        XCTAssertEqual(saveCount, 1)
+        XCTAssertNotNil(passwordFingerprint)
+        XCTAssertEqual(deletedIDs, [])
+        XCTAssertEqual(
+            model.importError,
+            ResourceLibraryOperationError.confirmationStale.safeMessage
+        )
         await model.shutdownAndWait()
     }
 
