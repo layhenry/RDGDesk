@@ -1036,6 +1036,49 @@ final class RdcAppModel: ObservableObject {
         }
     }
 
+    func createServer(
+        targetGroupID: String?,
+        expectedSnapshot: RdcLibrarySnapshot?,
+        draft: ServerPropertiesDraft
+    ) async throws -> String {
+        var operationResult: Result<String, Error>?
+        await performOperation { model, generation in
+            do {
+                let previous = try await model.configurationRepository.snapshot()
+                guard model.isCurrentOperation(generation) else { throw CancellationError() }
+                guard previous.lastLibrary == expectedSnapshot else {
+                    throw ResourceLibraryOperationError.libraryChanged
+                }
+                let base = previous.lastLibrary?.normalizedStableIdentity()
+                    ?? ResourceLibraryEditor.makeLocalLibrary()
+                guard let destinationID = targetGroupID ?? base.root.id else {
+                    throw ResourceLibraryOperationError.missingLibrary
+                }
+                let creation = try ResourceLibraryEditor.createServer(
+                    in: base, parentID: destinationID, draft: draft
+                )
+                let committed = try await model.configurationRepository.update { configuration in
+                    guard configuration.lastLibrary == expectedSnapshot else {
+                        throw ResourceLibraryOperationError.libraryChanged
+                    }
+                    configuration.lastLibrary = creation.snapshot
+                    return configuration
+                }
+                model.publishResourceConfiguration(
+                    committed, selectedServerID: creation.serverID
+                )
+                operationResult = .success(creation.serverID)
+            } catch {
+                let safeError = model.safeResourceOperationError(error)
+                operationResult = .failure(safeError)
+                guard model.isCurrentOperation(generation) else { return }
+                model.resourceOperationMessage = model.safeResourceOperationMessage(for: safeError)
+            }
+        }
+        guard let operationResult else { throw CancellationError() }
+        return try operationResult.get()
+    }
+
     func moveServer(id: String, destinationGroupID: String) async throws {
         try await persistResourceEdit { snapshot in
             try ResourceLibraryEditor.moveServer(

@@ -256,6 +256,127 @@ final class RdcAppWorkflowTests: XCTestCase {
         await model.shutdownAndWait()
     }
 
+    func testCreateServerBootstrapsLocalLibraryPersistsOnceAndSelectsServer() async throws {
+        let store = AppControlledConfigurationStore(configuration: .default)
+        let repository = RdcConfigurationRepository(store: store)
+        let model = RdcAppModel(
+            configurationRepository: repository,
+            passwordStore: AppMemoryPasswordStore(),
+            engine: AppRecordingSessionEngine()
+        )
+        await model.loadPersistedState()
+
+        let serverID = try await model.createServer(
+            targetGroupID: nil,
+            expectedSnapshot: nil,
+            draft: .init(displayName: "生产机", host: "203.0.113.170", port: 3_389)
+        )
+
+        let savedCount = await store.savedCount()
+        XCTAssertEqual(savedCount, 1)
+        XCTAssertEqual(model.library?.sourceName, "我的服务器")
+        XCTAssertEqual(model.selectedServerID, serverID)
+        XCTAssertEqual(model.selectedServer?.connectionRequest.host, "203.0.113.170")
+        XCTAssertNil(model.configuration.serverCredentialBindings[serverID])
+
+        let reloaded = RdcAppModel(
+            configurationRepository: repository,
+            passwordStore: AppMemoryPasswordStore(),
+            engine: AppRecordingSessionEngine()
+        )
+        await reloaded.loadPersistedState()
+        XCTAssertTrue(reloaded.library?.servers.contains { $0.id == serverID } == true)
+        await reloaded.shutdownAndWait()
+        await model.shutdownAndWait()
+    }
+
+    func testCreateServerAddsToRequestedGroupAndRejectsStaleSnapshot() async throws {
+        let snapshot = RdcLibrarySnapshot(
+            sourceID: "manual-target", sourceName: "example.rdg", document: nestedDocument()
+        )
+        let store = AppMemoryConfigurationStore(
+            configuration: RdcAppConfiguration(lastLibrary: snapshot)
+        )
+        let repository = RdcConfigurationRepository(store: store)
+        let model = RdcAppModel(
+            configurationRepository: repository,
+            passwordStore: AppMemoryPasswordStore(),
+            engine: AppRecordingSessionEngine()
+        )
+        await model.loadPersistedState()
+        let groupID = try XCTUnwrap(snapshot.root.groups.first?.id)
+        let serverID = try await model.createServer(
+            targetGroupID: groupID,
+            expectedSnapshot: snapshot,
+            draft: .init(displayName: "Group Server", host: "server.example", port: 3_390)
+        )
+        XCTAssertEqual(model.library?.servers.first { $0.id == serverID }?.groupPathIDs.last, groupID)
+
+        let error = await captureError {
+            _ = try await model.createServer(
+                targetGroupID: groupID,
+                expectedSnapshot: snapshot,
+                draft: .init(displayName: "Stale", host: "stale.example", port: 3_389)
+            )
+        }
+        XCTAssertEqual(error as? ResourceLibraryOperationError, .libraryChanged)
+        await model.shutdownAndWait()
+    }
+
+    func testCreatedServerInheritsGlobalCredentialWithoutServerBinding() async throws {
+        let globalID = "global-manual-server"
+        let store = AppMemoryConfigurationStore(configuration: RdcAppConfiguration(
+            globalCredentialID: globalID,
+            credentialMetadata: [
+                globalID: CredentialMetadata(id: globalID, username: "global-user", domain: nil)
+            ]
+        ))
+        let model = RdcAppModel(
+            configurationRepository: RdcConfigurationRepository(store: store),
+            passwordStore: AppMemoryPasswordStore(),
+            engine: AppRecordingSessionEngine()
+        )
+        await model.loadPersistedState()
+        let serverID = try await model.createServer(
+            targetGroupID: nil,
+            expectedSnapshot: nil,
+            draft: .init(displayName: "Inherited", host: "192.0.2.50", port: 3_389)
+        )
+        let server = try XCTUnwrap(model.library?.servers.first { $0.id == serverID })
+        XCTAssertEqual(
+            CredentialResolver.resolve(server: server, configuration: model.configuration),
+            CredentialResolution(credentialID: globalID, source: .global)
+        )
+        XCTAssertNil(model.configuration.serverCredentialBindings[serverID])
+        await model.shutdownAndWait()
+    }
+
+    func testCreateServerDoesNotDisconnectExistingSession() async throws {
+        let snapshot = RdcLibrarySnapshot(
+            sourceID: "manual-while-connected", sourceName: "example.rdg", document: testDocument()
+        )
+        let engine = AppRecordingSessionEngine()
+        let model = makeModel(
+            configuration: RdcAppConfiguration(lastLibrary: snapshot), engine: engine
+        )
+        await model.loadPersistedState()
+        try await model.session.connect(
+            server: try XCTUnwrap(model.selectedServer),
+            credential: nil,
+            viewport: .init(width: 800, height: 600)
+        )
+        let rootID = try XCTUnwrap(snapshot.root.id)
+        _ = try await model.createServer(
+            targetGroupID: rootID,
+            expectedSnapshot: snapshot,
+            draft: .init(displayName: "Second", host: "192.0.2.60", port: 3_389)
+        )
+        XCTAssertNotNil(model.session.descriptor)
+        let disconnectCount = await engine.disconnectCount()
+        XCTAssertEqual(disconnectCount, 0)
+        await model.shutdownAndWait()
+    }
+
     func testEveryPropertyAndMoveOperationPersistsOnceAndPreservesBindings() async throws {
         let snapshot = RdcLibrarySnapshot(
             sourceID: "all-resource-edits", sourceName: "example.rdg", document: nestedDocument()
