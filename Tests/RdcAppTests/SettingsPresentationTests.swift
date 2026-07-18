@@ -28,8 +28,7 @@ final class SettingsPresentationTests: XCTestCase {
 
     func testSidebarNewServerTargetUsesVisibleLibraryOrBootstrap() throws {
         let bootstrap = SidebarNewServerTargetPolicy.target(for: nil)
-        XCTAssertNil(bootstrap.targetGroupID)
-        XCTAssertEqual(bootstrap.targetGroupName, "我的服务器")
+        XCTAssertEqual(bootstrap, .localLibrary(name: "我的服务器"))
 
         let library = RdcImportedLibrary(
             document: RdcManDocument(
@@ -48,8 +47,68 @@ final class SettingsPresentationTests: XCTestCase {
         )
         let root = try XCTUnwrap(library.groups.first { $0.parentID == nil })
         let visible = SidebarNewServerTargetPolicy.target(for: library)
-        XCTAssertEqual(visible.targetGroupID, root.id)
-        XCTAssertEqual(visible.targetGroupName, root.name)
+        XCTAssertEqual(visible, .group(id: root.id, name: root.name))
+    }
+
+    func testSidebarBootstrapFlowDoesNotRepublishHiddenImportedLibrary() async throws {
+        let hidden = RdcLibrarySnapshot(
+            sourceID: "hidden-presentation-source",
+            sourceName: "hidden.rdg",
+            document: RdcManDocument(
+                programVersion: "2.7",
+                schemaVersion: "3",
+                root: RdcGroup(
+                    name: "Hidden Root",
+                    isExpanded: true,
+                    logonCredentials: nil,
+                    groups: [],
+                    servers: [RdcServer(
+                        displayName: "Hidden Imported",
+                        address: RdcServerAddress("hidden.example.invalid:3389"),
+                        logonCredentials: nil
+                    )]
+                )
+            )
+        )
+        let preferences = RdcGeneralPreferences(
+            restoresLastLibrary: false,
+            doubleClickConnects: false,
+            resizesRemoteDesktopWithWindow: false
+        )
+        let store = SettingsMemoryConfigurationStore(
+            configuration: .init(lastLibrary: hidden, preferences: preferences)
+        )
+        let model = RdcAppModel(
+            configurationRepository: RdcConfigurationRepository(store: store),
+            passwordStore: SettingsMemoryPasswordStore(),
+            engine: MockRdpSessionEngine()
+        )
+        await model.loadPersistedState()
+        XCTAssertNil(model.library)
+        let target = SidebarNewServerTargetPolicy.target(for: model.library)
+        let lease = model.resourcePropertyCoordinator.register(host: .primaryWindow(id: UUID()))
+        XCTAssertTrue(model.requestNewServer(
+            destination: target,
+            ownerLease: lease
+        ))
+        let request = try XCTUnwrap(model.newServerRequest)
+        XCTAssertEqual(request.expectedSnapshot, hidden)
+        XCTAssertEqual(request.destination, .localLibrary(name: "我的服务器"))
+
+        let serverID = try await model.createServer(
+            destination: request.destination,
+            expectedSnapshot: request.expectedSnapshot,
+            draft: .init(displayName: "Visible Local", host: "203.0.113.93", port: 3_389)
+        )
+
+        let persisted = await store.current()
+        XCTAssertEqual(persisted.lastLibrary?.sourceID, ResourceLibraryEditor.localLibrarySourceID)
+        XCTAssertEqual(persisted.lastLibrary?.sourceName, "我的服务器")
+        XCTAssertEqual(persisted.lastLibrary?.root.name, "我的服务器")
+        XCTAssertEqual(persisted.lastLibrary?.allServers.compactMap(\.id), [serverID])
+        XCTAssertEqual(model.library?.sourceID, ResourceLibraryEditor.localLibrarySourceID)
+        XCTAssertEqual(model.selectedServerID, serverID)
+        await model.shutdownAndWait()
     }
 
     func testPendingGroupDeletionUsesExactRecursiveWarningCopy() {
@@ -255,8 +314,7 @@ final class SettingsPresentationTests: XCTestCase {
         let leaseA = coordinator.register(host: .primaryWindow(id: UUID()))
         let leaseB = coordinator.register(host: .primaryWindow(id: UUID()))
         let request = NewServerRequest(
-            targetGroupID: nil,
-            targetGroupName: "我的服务器",
+            destination: .localLibrary(name: "我的服务器"),
             expectedSnapshot: nil,
             ownerLease: leaseA
         )
@@ -269,8 +327,7 @@ final class SettingsPresentationTests: XCTestCase {
         XCTAssertNil(coordinator.newServerPresentation(requested: request, lease: leaseB))
         XCTAssertEqual(coordinator.claimNewServer(
             NewServerRequest(
-                targetGroupID: "another-group",
-                targetGroupName: "另一个群组",
+                destination: .group(id: "another-group", name: "另一个群组"),
                 expectedSnapshot: nil,
                 ownerLease: leaseA
             ),
@@ -291,8 +348,7 @@ final class SettingsPresentationTests: XCTestCase {
         let leaseA = coordinator.register(host: .primaryWindow(id: UUID()))
         let leaseB = coordinator.register(host: .primaryWindow(id: UUID()))
         let request = NewServerRequest(
-            targetGroupID: nil,
-            targetGroupName: "我的服务器",
+            destination: .localLibrary(name: "我的服务器"),
             expectedSnapshot: nil,
             ownerLease: leaseA
         )
@@ -342,8 +398,7 @@ final class SettingsPresentationTests: XCTestCase {
         let coordinator = ResourcePropertySheetCoordinator()
         let lease = coordinator.register(host: .primaryWindow(id: UUID()))
         let request = NewServerRequest(
-            targetGroupID: nil,
-            targetGroupName: "我的服务器",
+            destination: .localLibrary(name: "我的服务器"),
             expectedSnapshot: nil,
             ownerLease: lease
         )
@@ -410,8 +465,7 @@ final class SettingsPresentationTests: XCTestCase {
         let coordinator = ResourcePropertySheetCoordinator()
         let lease = coordinator.register(host: .primaryWindow(id: UUID()))
         let request = NewServerRequest(
-            targetGroupID: nil,
-            targetGroupName: "我的服务器",
+            destination: .localLibrary(name: "我的服务器"),
             expectedSnapshot: nil,
             ownerLease: lease
         )
@@ -1922,5 +1976,37 @@ final class SettingsPresentationTests: XCTestCase {
             pemData: data,
             flags: UInt32(fingerprintSeed) | 0x80
         )
+    }
+}
+
+private actor SettingsMemoryConfigurationStore: RdcConfigurationStore {
+    private var configuration: RdcAppConfiguration
+
+    init(configuration: RdcAppConfiguration) {
+        self.configuration = configuration
+    }
+
+    func load() async throws -> RdcAppConfiguration { configuration }
+
+    func save(_ configuration: RdcAppConfiguration) async throws {
+        self.configuration = configuration
+    }
+
+    func current() -> RdcAppConfiguration { configuration }
+}
+
+private actor SettingsMemoryPasswordStore: PasswordStore {
+    private var passwords: [String: String] = [:]
+
+    func save(password: String, credentialID: String) async throws {
+        passwords[credentialID] = password
+    }
+
+    func password(credentialID: String) async throws -> String? {
+        passwords[credentialID]
+    }
+
+    func delete(credentialID: String) async throws {
+        passwords.removeValue(forKey: credentialID)
     }
 }

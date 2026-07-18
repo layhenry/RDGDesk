@@ -36,11 +36,11 @@ enum SidebarAddMenuPolicy {
 enum SidebarNewServerTargetPolicy {
     static func target(
         for library: RdcImportedLibrary?
-    ) -> (targetGroupID: String?, targetGroupName: String) {
+    ) -> NewServerDestination {
         guard let root = library?.groups.first(where: { $0.parentID == nil }) else {
-            return (nil, "我的服务器")
+            return .localLibrary(name: "我的服务器")
         }
-        return (root.id, root.name)
+        return .group(id: root.id, name: root.name)
     }
 }
 
@@ -298,8 +298,7 @@ struct ResourceLibraryRowMenu: View {
         )
         Button("添加服务器…") {
             _ = model.requestNewServer(
-                targetGroupID: group.id,
-                targetGroupName: group.name,
+                destination: .group(id: group.id, name: group.name),
                 ownerLease: ownerLease
             )
         }

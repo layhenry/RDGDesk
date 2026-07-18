@@ -83,6 +83,84 @@ final class ResourceLibraryEditorTests: XCTestCase {
         XCTAssertTrue(merged.allServers.contains { $0.id == creation.serverID })
     }
 
+    func testMergeReimportRetainsRemovedImportedParentAsLocalShellForManualDescendants() throws {
+        let original = parentChangeFixture(parentName: "Imported Parent")
+        let parentID = try XCTUnwrap(original.root.groups.first?.id)
+        let importedServerID = try XCTUnwrap(original.root.groups.first?.servers.first?.id)
+        var existing = try ResourceLibraryEditor.createServer(
+            in: original,
+            parentID: parentID,
+            draft: .init(displayName: "Manual Direct", host: "192.0.2.81", port: 3_389)
+        ).snapshot
+        let manualDirectID = try XCTUnwrap(
+            existing.root.groups.first?.servers.first(where: { $0.sourceFingerprint == nil })?.id
+        )
+        existing = try ResourceLibraryEditor.createChildGroup(
+            in: existing,
+            parentID: parentID,
+            name: "Manual Child"
+        )
+        let manualChildID = try XCTUnwrap(
+            existing.root.groups.first?.groups.first(where: { $0.name == "Manual Child" })?.id
+        )
+        let nestedCreation = try ResourceLibraryEditor.createServer(
+            in: existing,
+            parentID: manualChildID,
+            draft: .init(displayName: "Manual Nested", host: "192.0.2.82", port: 3_390)
+        )
+
+        let merged = ResourceLibraryEditor.mergeReimport(
+            existing: nestedCreation.snapshot,
+            imported: parentChangeFixture(parentName: nil),
+            restoreDeletedItems: false
+        )
+
+        let retainedParent = try XCTUnwrap(merged.root.groups.first { $0.id == parentID })
+        XCTAssertEqual(retainedParent.name, "Imported Parent")
+        XCTAssertNil(retainedParent.sourceFingerprint)
+        XCTAssertEqual(
+            retainedParent.servers.filter { $0.sourceFingerprint == nil }.compactMap(\.id),
+            [manualDirectID]
+        )
+        let retainedChild = try XCTUnwrap(
+            retainedParent.groups.first { $0.id == manualChildID }
+        )
+        XCTAssertEqual(retainedChild.name, "Manual Child")
+        XCTAssertNil(retainedChild.sourceFingerprint)
+        XCTAssertEqual(retainedChild.servers.compactMap(\.id), [nestedCreation.serverID])
+        XCTAssertFalse(merged.allServers.contains { $0.id == importedServerID })
+        XCTAssertFalse(retainedParent.groups.contains { $0.name == "Imported Child" })
+    }
+
+    func testMergeReimportRetainsRenamedImportedParentShellAndAddsNewUpstreamParent() throws {
+        let original = parentChangeFixture(parentName: "Imported Parent")
+        let parentID = try XCTUnwrap(original.root.groups.first?.id)
+        let importedServerID = try XCTUnwrap(original.root.groups.first?.servers.first?.id)
+        let creation = try ResourceLibraryEditor.createServer(
+            in: original,
+            parentID: parentID,
+            draft: .init(displayName: "Manual", host: "198.51.100.81", port: 3_389)
+        )
+
+        let merged = ResourceLibraryEditor.mergeReimport(
+            existing: creation.snapshot,
+            imported: parentChangeFixture(parentName: "Renamed Parent"),
+            restoreDeletedItems: false
+        )
+
+        let retainedParent = try XCTUnwrap(merged.root.groups.first { $0.id == parentID })
+        XCTAssertEqual(retainedParent.name, "Imported Parent")
+        XCTAssertNil(retainedParent.sourceFingerprint)
+        XCTAssertEqual(retainedParent.servers.compactMap(\.id), [creation.serverID])
+        XCTAssertFalse(merged.allServers.contains { $0.id == importedServerID })
+        let renamedParent = try XCTUnwrap(
+            merged.root.groups.first { $0.name == "Renamed Parent" }
+        )
+        XCTAssertNotEqual(renamedParent.id, parentID)
+        XCTAssertNotNil(renamedParent.sourceFingerprint)
+        XCTAssertEqual(renamedParent.servers.map(\.displayName), ["Imported Server"])
+    }
+
     func testUpdateServerValidatesAndPreservesIdentity() throws {
         let snapshot = editableFixture()
         let serverID = try XCTUnwrap(snapshot.root.groups[0].servers[0].id)
@@ -610,6 +688,31 @@ final class ResourceLibraryEditorTests: XCTestCase {
                     group("Parent", groups: [group("Child", servers: servers)]),
                     group("Destination")
                 ],
+                servers: []
+            )
+        )
+    }
+
+    private func parentChangeFixture(parentName: String?) -> RdcLibrarySnapshot {
+        let groups: [RdcGroup]
+        if let parentName {
+            groups = [group(
+                parentName,
+                groups: [group(
+                    "Imported Child",
+                    servers: [server("Imported Nested", "nested.example:3389")]
+                )],
+                servers: [server("Imported Server", "upstream.example:3389")]
+            )]
+        } else {
+            groups = []
+        }
+        return snapshot(
+            root: RdcGroup(
+                name: "Root",
+                isExpanded: true,
+                logonCredentials: nil,
+                groups: groups,
                 servers: []
             )
         )

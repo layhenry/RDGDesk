@@ -11,7 +11,7 @@ struct NewServerSheet: View {
         VStack(alignment: .leading, spacing: 18) {
             Text("添加服务器")
                 .font(.system(size: 20, weight: .semibold))
-            Text("将添加到“\(request.targetGroupName)”，账号密码继承全局设置。")
+            Text("将添加到“\(request.destination.name)”，账号密码继承全局设置。")
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
             Form {
@@ -42,7 +42,7 @@ struct NewServerSheet: View {
                     Task {
                         let saved = await editor.save { draft in
                             _ = try await model.createServer(
-                                targetGroupID: request.targetGroupID,
+                                destination: request.destination,
                                 expectedSnapshot: request.expectedSnapshot,
                                 draft: draft
                             )

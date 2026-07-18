@@ -690,7 +690,7 @@ private extension ResourceLibraryEditor {
     ) -> RdcGroupSnapshot? {
         if !isRoot, let fingerprint = group.sourceFingerprint {
             let marker = RdcDeletedSourceItem(kind: .group, sourceFingerprint: fingerprint)
-            guard importedFingerprints.groups.contains(fingerprint), !tombstones.contains(marker) else {
+            guard !tombstones.contains(marker) else {
                 return nil
             }
         }
@@ -709,7 +709,19 @@ private extension ResourceLibraryEditor {
                 tombstones: tombstones
             )
         }
+        if !isRoot, let fingerprint = group.sourceFingerprint,
+           !importedFingerprints.groups.contains(fingerprint) {
+            guard hasManualDescendant(in: copy) else { return nil }
+            copy.sourceFingerprint = nil
+        }
         return copy
+    }
+
+    static func hasManualDescendant(in group: RdcGroupSnapshot) -> Bool {
+        group.servers.contains { $0.sourceFingerprint == nil }
+            || group.groups.contains { child in
+                child.sourceFingerprint == nil || hasManualDescendant(in: child)
+            }
     }
 
     static func mergeImportedGroup(

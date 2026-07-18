@@ -214,6 +214,7 @@ struct PendingLibraryReplacement: Identifiable {
 enum ResourceLibraryOperationError: Error, Equatable {
     case missingLibrary
     case libraryChanged
+    case hiddenLibraryContainsManualResources
     case sessionDisconnectFailed
     case passwordStoreFailed
     case passwordRollbackFailed
@@ -225,6 +226,8 @@ enum ResourceLibraryOperationError: Error, Equatable {
         switch self {
         case .missingLibrary: "资源库尚未载入。"
         case .libraryChanged: "资源库已被其他操作更新，请重试。"
+        case .hiddenLibraryContainsManualResources:
+            "已隐藏的资源库包含手动资源。请先恢复或管理该资源库，再添加服务器。"
         case .sessionDisconnectFailed: "无法安全断开当前连接，请稍后重试。"
         case .passwordStoreFailed: "无法更新钥匙串凭据，资源库未更改。"
         case .passwordRollbackFailed: "资源库未更改，但部分钥匙串凭据可能需要重新输入。请立即检查相关账户。"
@@ -300,6 +303,11 @@ final class RdcAppModel: ObservableObject {
     }
 
     private var pendingDeletedImportRestore: PendingDeletedImportRestore?
+
+    private struct CommittedServerCreation: Sendable {
+        let configuration: RdcAppConfiguration
+        let serverID: String
+    }
 
     convenience init(
         configurationRepository: RdcConfigurationRepository = RdcConfigurationRepository(
@@ -1129,7 +1137,7 @@ final class RdcAppModel: ObservableObject {
     }
 
     func createServer(
-        targetGroupID: String?,
+        destination: NewServerDestination,
         expectedSnapshot: RdcLibrarySnapshot?,
         draft: ServerPropertiesDraft
     ) async throws -> String {
@@ -1141,25 +1149,44 @@ final class RdcAppModel: ObservableObject {
                 guard previous.lastLibrary == expectedSnapshot else {
                     throw ResourceLibraryOperationError.libraryChanged
                 }
-                let base = previous.lastLibrary?.normalizedStableIdentity()
-                    ?? ResourceLibraryEditor.makeLocalLibrary()
-                guard let destinationID = targetGroupID ?? base.root.id else {
-                    throw ResourceLibraryOperationError.missingLibrary
-                }
-                let creation = try ResourceLibraryEditor.createServer(
-                    in: base, parentID: destinationID, draft: draft
-                )
-                let committed = try await model.configurationRepository.update { configuration in
+                let committed = try await model.configurationRepository.update {
+                    configuration -> CommittedServerCreation in
                     guard configuration.lastLibrary == expectedSnapshot else {
                         throw ResourceLibraryOperationError.libraryChanged
                     }
+                    let base: RdcLibrarySnapshot
+                    let destinationID: String
+                    switch destination {
+                    case let .localLibrary(name):
+                        if let hidden = configuration.lastLibrary,
+                           !ResourceLibraryEditor.manualResourceImpact(in: hidden).isEmpty {
+                            throw ResourceLibraryOperationError.hiddenLibraryContainsManualResources
+                        }
+                        base = ResourceLibraryEditor.makeLocalLibrary(name: name)
+                        guard let rootID = base.root.id else {
+                            throw ResourceLibraryOperationError.missingLibrary
+                        }
+                        destinationID = rootID
+                    case let .group(id, _):
+                        guard let existing = configuration.lastLibrary else {
+                            throw ResourceLibraryOperationError.missingLibrary
+                        }
+                        base = existing.normalizedStableIdentity()
+                        destinationID = id
+                    }
+                    let creation = try ResourceLibraryEditor.createServer(
+                        in: base, parentID: destinationID, draft: draft
+                    )
                     configuration.lastLibrary = creation.snapshot
-                    return configuration
+                    return CommittedServerCreation(
+                        configuration: configuration,
+                        serverID: creation.serverID
+                    )
                 }
                 model.publishResourceConfiguration(
-                    committed, selectedServerID: creation.serverID
+                    committed.configuration, selectedServerID: committed.serverID
                 )
-                operationResult = .success(creation.serverID)
+                operationResult = .success(committed.serverID)
             } catch {
                 let safeError = model.safeResourceOperationError(error)
                 operationResult = .failure(safeError)
@@ -1283,18 +1310,20 @@ final class RdcAppModel: ObservableObject {
 
     @discardableResult
     func requestNewServer(
-        targetGroupID: String?,
-        targetGroupName: String,
+        destination: NewServerDestination,
         ownerLease: ResourcePropertySheetCoordinator.HostLease
     ) -> Bool {
         guard resourcePropertyCoordinator.isActiveLease(ownerLease) else { return false }
-        if let targetGroupID,
-           library?.groups.contains(where: { $0.id == targetGroupID }) != true {
-            return false
+        switch destination {
+        case .localLibrary:
+            guard library == nil else { return false }
+        case let .group(id, _):
+            guard library?.groups.contains(where: { $0.id == id }) == true else {
+                return false
+            }
         }
         newServerRequest = NewServerRequest(
-            targetGroupID: targetGroupID,
-            targetGroupName: targetGroupName,
+            destination: destination,
             expectedSnapshot: configuration.lastLibrary,
             ownerLease: ownerLease
         )

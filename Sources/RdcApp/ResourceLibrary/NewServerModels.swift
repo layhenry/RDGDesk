@@ -2,9 +2,19 @@ import Combine
 import Foundation
 import RdcCore
 
+enum NewServerDestination: Equatable, Sendable {
+    case localLibrary(name: String)
+    case group(id: String, name: String)
+
+    var name: String {
+        switch self {
+        case let .localLibrary(name), let .group(_, name): name
+        }
+    }
+}
+
 struct NewServerRequest: Identifiable, Equatable {
-    let targetGroupID: String?
-    let targetGroupName: String
+    let destination: NewServerDestination
     let expectedSnapshot: RdcLibrarySnapshot?
     let ownerLease: ResourcePropertySheetCoordinator.HostLease
     let id = UUID()
