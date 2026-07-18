@@ -3,6 +3,7 @@
 .build/integration/
 .swiftpm/
 .worktrees/
+.superpowers/
 DerivedData/
 dist/
 .DS_Store
