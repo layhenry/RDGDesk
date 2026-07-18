@@ -2,6 +2,87 @@ import XCTest
 @testable import RdcCore
 
 final class ResourceLibraryEditorTests: XCTestCase {
+    func testServerDraftTrimsHostAndRejectsMalformedDottedIPv4() throws {
+        let validated = try ServerPropertiesDraft(
+            displayName: "  测试机  ", host: "  203.0.113.170  ", port: 3_389
+        ).validated()
+        XCTAssertEqual(validated.displayName, "测试机")
+        XCTAssertEqual(validated.host, "203.0.113.170")
+
+        for host in ["999.54.202.170", "106.54.202.999", "1..2.3"] {
+            XCTAssertThrowsError(
+                try ServerPropertiesDraft(displayName: "Server", host: host, port: 3_389)
+                    .validated()
+            ) { XCTAssertEqual($0 as? ResourceLibraryEditError, .invalidHost) }
+        }
+    }
+
+    func testCreateServerAddsMacOnlyNodeToExactGroup() throws {
+        let snapshot = editableFixture()
+        let parentID = try XCTUnwrap(snapshot.root.groups.first?.id)
+        let result = try ResourceLibraryEditor.createServer(
+            in: snapshot,
+            parentID: parentID,
+            draft: .init(displayName: "  手动服务器  ", host: "2001:db8::20", port: 3_390)
+        )
+        let created = try XCTUnwrap(
+            result.snapshot.root.groups.first?.servers.first { $0.id == result.serverID }
+        )
+        XCTAssertEqual(created.displayName, "手动服务器")
+        XCTAssertEqual(created.address, "[2001:db8::20]:3390")
+        XCTAssertNotNil(UUID(uuidString: result.serverID))
+        XCTAssertNil(created.sourceFingerprint)
+        XCTAssertTrue(snapshot.root.groups.first?.servers.contains { $0.id == result.serverID } == false)
+    }
+
+    func testCreateServerRejectsMissingGroupWithoutChangingSnapshot() throws {
+        let snapshot = editableFixture()
+        XCTAssertThrowsError(
+            try ResourceLibraryEditor.createServer(
+                in: snapshot, parentID: "missing",
+                draft: .init(displayName: "Server", host: "server.example", port: 3_389)
+            )
+        ) { XCTAssertEqual($0 as? ResourceLibraryEditError, .missingResource) }
+        XCTAssertEqual(snapshot, editableFixture())
+    }
+
+    func testLocalLibraryAndManualImpactExcludeImportedNodes() throws {
+        let local = ResourceLibraryEditor.makeLocalLibrary()
+        XCTAssertEqual(local.sourceID, ResourceLibraryEditor.localLibrarySourceID)
+        XCTAssertEqual(local.sourceName, "我的服务器")
+        XCTAssertEqual(local.root.name, "我的服务器")
+
+        let rootID = try XCTUnwrap(local.root.id)
+        let created = try ResourceLibraryEditor.createServer(
+            in: local, parentID: rootID,
+            draft: .init(displayName: "Local", host: "192.0.2.10", port: 3_389)
+        )
+        XCTAssertEqual(
+            ResourceLibraryEditor.manualResourceImpact(in: created.snapshot),
+            ManualResourceImpact(groupCount: 0, serverCount: 1)
+        )
+        XCTAssertEqual(
+            ResourceLibraryEditor.manualResourceImpact(in: editableFixture()),
+            ManualResourceImpact(groupCount: 0, serverCount: 0)
+        )
+    }
+
+    func testSameSourceReimportPreservesManuallyCreatedServer() throws {
+        let imported = editableFixture()
+        let rootID = try XCTUnwrap(imported.root.id)
+        let creation = try ResourceLibraryEditor.createServer(
+            in: imported,
+            parentID: rootID,
+            draft: .init(displayName: "Manual", host: "192.0.2.40", port: 3_389)
+        )
+        let merged = ResourceLibraryEditor.mergeReimport(
+            existing: creation.snapshot,
+            imported: imported,
+            restoreDeletedItems: false
+        )
+        XCTAssertTrue(merged.allServers.contains { $0.id == creation.serverID })
+    }
+
     func testUpdateServerValidatesAndPreservesIdentity() throws {
         let snapshot = editableFixture()
         let serverID = try XCTUnwrap(snapshot.root.groups[0].servers[0].id)
@@ -30,7 +111,7 @@ final class ResourceLibraryEditorTests: XCTestCase {
             try ServerPropertiesDraft(displayName: "   ", host: "host", port: 3_389).validated()
         ) { XCTAssertEqual($0 as? ResourceLibraryEditError, .emptyName) }
 
-        for invalidHost in ["https://host", "host name", "host/path", "\tserver"] {
+        for invalidHost in ["https://host", "host name", "host/path", "server\tname"] {
             XCTAssertThrowsError(
                 try ServerPropertiesDraft(
                     displayName: "Server",

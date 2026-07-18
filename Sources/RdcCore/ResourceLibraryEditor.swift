@@ -14,43 +14,47 @@ public struct ServerPropertiesDraft: Equatable, Sendable {
 
     public func validated() throws -> ServerPropertiesDraft {
         let trimmedName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedHost = host.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else {
             throw ResourceLibraryEditError.emptyName
         }
-        guard !host.isEmpty,
-              !host.contains(where: { $0.isWhitespace }),
-              !host.contains("/"),
-              !host.contains("://"),
-              !host.contains("?"),
-              !host.contains("@"),
-              !host.contains("["),
-              !host.contains("]"),
-              isValidHostShape(host) else {
+        guard !trimmedHost.isEmpty,
+              !trimmedHost.contains(where: { $0.isWhitespace }),
+              !trimmedHost.contains("/"),
+              !trimmedHost.contains("://"),
+              !trimmedHost.contains("?"),
+              !trimmedHost.contains("@"),
+              !trimmedHost.contains("["),
+              !trimmedHost.contains("]"),
+              isValidHostShape(trimmedHost) else {
             throw ResourceLibraryEditError.invalidHost
         }
         guard (1...65_535).contains(port) else {
             throw ResourceLibraryEditError.invalidPort
         }
-        return ServerPropertiesDraft(displayName: trimmedName, host: host, port: port)
+        return ServerPropertiesDraft(displayName: trimmedName, host: trimmedHost, port: port)
     }
+}
 
-    private func isValidHostShape(_ value: String) -> Bool {
-        let colonCount = value.filter { $0 == ":" }.count
-        if colonCount == 0 {
-            guard value.utf8.count <= 253 else { return false }
-            let labels = value.split(separator: ".", omittingEmptySubsequences: false)
-            return !labels.isEmpty && labels.allSatisfy { label in
-                !label.isEmpty && label.utf8.count <= 63
-                    && label.first != "-" && label.last != "-"
-                    && label.allSatisfy { character in
-                        character.isASCII
-                            && (character.isLetter || character.isNumber || character == "-")
-                    }
-            }
-        }
-        guard colonCount >= 2 else { return false }
+private func isValidHostShape(_ value: String) -> Bool {
+    if value.contains(":") {
+        guard value.filter({ $0 == ":" }).count >= 2 else { return false }
         var address = in6_addr()
         return value.withCString { inet_pton(AF_INET6, $0, &address) == 1 }
+    }
+    if value.contains("."), value.allSatisfy({ $0.isNumber || $0 == "." }) {
+        var address = in_addr()
+        return value.withCString { inet_pton(AF_INET, $0, &address) == 1 }
+    }
+    guard value.utf8.count <= 253 else { return false }
+    let labels = value.split(separator: ".", omittingEmptySubsequences: false)
+    return !labels.isEmpty && labels.allSatisfy { label in
+        !label.isEmpty && label.utf8.count <= 63
+            && label.first != "-" && label.last != "-"
+            && label.allSatisfy { character in
+                character.isASCII
+                    && (character.isLetter || character.isNumber || character == "-")
+            }
     }
 }
 
@@ -80,6 +84,23 @@ public struct ResourceDeletionImpact: Equatable, Sendable {
         self.serverCount = serverCount
         self.containsSelectedServer = containsSelectedServer
     }
+}
+
+public struct ResourceServerCreationResult: Equatable, Sendable {
+    public let snapshot: RdcLibrarySnapshot
+    public let serverID: String
+}
+
+public struct ManualResourceImpact: Equatable, Sendable {
+    public let groupCount: Int
+    public let serverCount: Int
+
+    public init(groupCount: Int, serverCount: Int) {
+        self.groupCount = groupCount
+        self.serverCount = serverCount
+    }
+
+    public var isEmpty: Bool { groupCount == 0 && serverCount == 0 }
 }
 
 public struct ResourceDeletionResult: Equatable, Sendable {
@@ -119,6 +140,68 @@ public enum ResourceLibraryEditError: Error, Equatable, Sendable {
 }
 
 public enum ResourceLibraryEditor {
+    public static let localLibrarySourceID = "rdgdesk-local-library-v1"
+
+    public static func makeLocalLibrary(name: String = "我的服务器") -> RdcLibrarySnapshot {
+        RdcLibrarySnapshot(
+            sourceID: localLibrarySourceID,
+            sourceName: name,
+            document: RdcManDocument(
+                programVersion: "2.7",
+                schemaVersion: "3",
+                root: RdcGroup(
+                    name: name,
+                    isExpanded: true,
+                    logonCredentials: nil,
+                    groups: [],
+                    servers: []
+                )
+            )
+        )
+    }
+
+    public static func createServer(
+        in snapshot: RdcLibrarySnapshot,
+        parentID: String,
+        draft: ServerPropertiesDraft
+    ) throws -> ResourceServerCreationResult {
+        let validated = try draft.validated()
+        let serverID = UUID().uuidString
+        let serializedHost = validated.host.contains(":")
+            ? "[\(validated.host)]" : validated.host
+        var copy = snapshot
+        guard mutateGroup(&copy.root, where: { parent in
+            guard parent.id == parentID else { return false }
+            var server = RdcServerSnapshot(server: RdcServer(
+                displayName: validated.displayName,
+                address: RdcServerAddress("\(serializedHost):\(validated.port)"),
+                logonCredentials: nil
+            ))
+            server.id = serverID
+            server.sourceFingerprint = nil
+            parent.servers.append(server)
+            return true
+        }) else {
+            throw ResourceLibraryEditError.missingResource
+        }
+        return ResourceServerCreationResult(snapshot: copy, serverID: serverID)
+    }
+
+    public static func manualResourceImpact(
+        in snapshot: RdcLibrarySnapshot
+    ) -> ManualResourceImpact {
+        func collect(_ group: RdcGroupSnapshot, isRoot: Bool) -> ManualResourceImpact {
+            let children = group.groups.map { collect($0, isRoot: false) }
+            return ManualResourceImpact(
+                groupCount: (isRoot || group.sourceFingerprint != nil ? 0 : 1)
+                    + children.reduce(0) { $0 + $1.groupCount },
+                serverCount: group.servers.filter { $0.sourceFingerprint == nil }.count
+                    + children.reduce(0) { $0 + $1.serverCount }
+            )
+        }
+        return collect(snapshot.root, isRoot: true)
+    }
+
     public static func updateServer(
         in snapshot: RdcLibrarySnapshot,
         id: String,
