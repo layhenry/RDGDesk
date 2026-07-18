@@ -37,8 +37,9 @@ final class NewServerEditorModel: ObservableObject {
     }
 
     var hostError: String? {
+        let validationName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         return (try? ServerPropertiesDraft(
-            displayName: name.isEmpty ? "Server" : name,
+            displayName: validationName.isEmpty ? "Server" : validationName,
             host: host,
             port: 3_389
         ).validated()) == nil ? "请输入有效的 IP 地址或主机名。" : nil

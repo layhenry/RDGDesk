@@ -1618,6 +1618,15 @@ final class SettingsPresentationTests: XCTestCase {
         XCTAssertEqual(editor.saveError, ResourceLibraryOperationError.libraryChanged.safeMessage)
     }
 
+    func testNewServerEditorKeepsHostValidationIndependentFromBlankName() {
+        let editor = NewServerEditorModel()
+        editor.updateName("   ")
+        editor.updateHost("server.example")
+
+        XCTAssertNotNil(editor.nameError)
+        XCTAssertNil(editor.hostError)
+    }
+
     private func fixtureLibrary() -> RdcImportedLibrary {
         let root = RdcGroup(
             name: "Root",
