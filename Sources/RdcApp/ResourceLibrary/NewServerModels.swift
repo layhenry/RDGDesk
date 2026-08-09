@@ -37,7 +37,26 @@ final class NewServerEditorModel: ObservableObject {
     func updateHost(_ value: String) {
         host = value
         if !didEditName {
-            name = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            name = (try? ServerEndpointInputParser.resolve(
+                address: value,
+                portText: portText
+            ).host) ?? value.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+    }
+
+    private var endpointResult: Result<
+        ServerEndpointInputResolution,
+        ServerEndpointInputValidationError
+    > {
+        do {
+            return .success(try ServerEndpointInputParser.resolve(
+                address: host,
+                portText: portText
+            ))
+        } catch let error as ServerEndpointInputValidationError {
+            return .failure(error)
+        } catch {
+            return .failure(.invalidHost)
         }
     }
 
@@ -47,31 +66,23 @@ final class NewServerEditorModel: ObservableObject {
     }
 
     var hostError: String? {
-        let validationName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        return (try? ServerPropertiesDraft(
-            displayName: validationName.isEmpty ? "Server" : validationName,
-            host: host,
-            port: 3_389
-        ).validated()) == nil ? "请输入有效的 IP 地址或主机名。" : nil
+        guard case let .failure(error) = endpointResult,
+              error != .invalidPort else { return nil }
+        return error.message
     }
 
     var portError: String? {
-        guard let port = Int(portText.trimmingCharacters(in: .whitespacesAndNewlines)),
-              (1...65_535).contains(port) else {
-            return "端口必须是 1–65535 之间的整数。"
-        }
-        return nil
+        guard case .failure(.invalidPort) = endpointResult else { return nil }
+        return ServerEndpointInputValidationError.invalidPort.message
     }
 
     var draft: ServerPropertiesDraft? {
-        guard nameError == nil, hostError == nil, portError == nil,
-              let port = Int(portText.trimmingCharacters(in: .whitespacesAndNewlines)) else {
-            return nil
-        }
+        guard nameError == nil,
+              case let .success(endpoint) = endpointResult else { return nil }
         return try? ServerPropertiesDraft(
             displayName: name,
-            host: host,
-            port: port
+            host: endpoint.host,
+            port: endpoint.port
         ).validated()
     }
 

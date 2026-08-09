@@ -1887,13 +1887,54 @@ final class SettingsPresentationTests: XCTestCase {
         XCTAssertEqual(editor.draft?.host, "192.0.2.171")
     }
 
+    func testNewServerEditorUsesEmbeddedPortWithoutChangingPortField() {
+        let editor = NewServerEditorModel()
+
+        editor.updateHost(" q6id.cn:6609 ")
+
+        XCTAssertEqual(editor.name, "q6id.cn")
+        XCTAssertEqual(editor.portText, "3389")
+        XCTAssertNil(editor.hostError)
+        XCTAssertNil(editor.portError)
+        XCTAssertEqual(
+            editor.draft,
+            ServerPropertiesDraft(displayName: "q6id.cn", host: "q6id.cn", port: 6_609)
+        )
+    }
+
+    func testNewServerEditorEmbeddedPortIgnoresInvalidSeparatePort() {
+        let editor = NewServerEditorModel()
+        editor.portText = "invalid"
+
+        editor.updateHost("[2001:db8::10]:6609")
+
+        XCTAssertEqual(editor.portText, "invalid")
+        XCTAssertNil(editor.hostError)
+        XCTAssertNil(editor.portError)
+        XCTAssertEqual(editor.draft?.host, "2001:db8::10")
+        XCTAssertEqual(editor.draft?.port, 6_609)
+        XCTAssertTrue(editor.canSave)
+    }
+
+    func testNewServerEditorReportsEmbeddedPortSeparately() {
+        let editor = NewServerEditorModel()
+        editor.updateHost("q6id.cn:70000")
+
+        XCTAssertEqual(
+            editor.hostError,
+            "地址中的端口必须是 1–65535 之间的整数。"
+        )
+        XCTAssertNil(editor.portError)
+        XCTAssertFalse(editor.canSave)
+    }
+
     func testNewServerEditorExposesFieldErrorsAndKeepsInputAfterSaveFailure() async {
         let editor = NewServerEditorModel()
         editor.updateName("Server")
         editor.updateHost("999.1.1.1")
         editor.portText = "70000"
         XCTAssertEqual(editor.hostError, "请输入有效的 IP 地址或主机名。")
-        XCTAssertEqual(editor.portError, "端口必须是 1–65535 之间的整数。")
+        XCTAssertNil(editor.portError)
 
         editor.updateHost("server.example")
         editor.portText = "3389"
