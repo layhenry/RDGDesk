@@ -1858,18 +1858,48 @@ final class SettingsPresentationTests: XCTestCase {
         XCTAssertNotEqual(itemA.sharedModalKind, itemB.sharedModalKind)
     }
 
-    func testServerPropertyEditorRejectsEmbeddedPortAndAcceptsBareIPv6() {
+    func testServerPropertyEditorAcceptsEmbeddedPortAndKeepsSeparatePortText() {
         let editor = ServerPropertyEditorModel(
             server: editableServerFixture(), credentialSummary: "继承凭据"
         )
-        editor.host = "example.com:3390"
-        XCTAssertNotNil(editor.hostError)
-        XCTAssertFalse(editor.canSave)
+        editor.portText = "invalid"
+
+        editor.host = "q6id.cn:6609"
+
+        XCTAssertEqual(editor.portText, "invalid")
+        XCTAssertNil(editor.hostError)
+        XCTAssertNil(editor.portError)
+        XCTAssertEqual(editor.draft?.host, "q6id.cn")
+        XCTAssertEqual(editor.draft?.port, 6_609)
+        XCTAssertTrue(editor.canSave)
+    }
+
+    func testServerPropertyEditorAcceptsBracketedIPv6AndBareIPv6() {
+        let editor = ServerPropertyEditorModel(
+            server: editableServerFixture(), credentialSummary: "继承凭据"
+        )
+
+        editor.host = "[2001:db8::10]:6609"
+        XCTAssertEqual(editor.draft?.host, "2001:db8::10")
+        XCTAssertEqual(editor.draft?.port, 6_609)
 
         editor.host = "2001:db8::10"
         editor.portText = "3390"
         XCTAssertNil(editor.hostError)
         XCTAssertEqual(editor.draft?.host, "2001:db8::10")
+        XCTAssertEqual(editor.draft?.port, 3_390)
+    }
+
+    func testServerPropertyEditorTreatsEquivalentCompleteAddressAsUnchanged() {
+        let editor = ServerPropertyEditorModel(
+            server: editableServerFixture(), credentialSummary: "继承凭据"
+        )
+
+        editor.host = "rdp.example.com:3389"
+
+        XCTAssertEqual(editor.draft?.host, "rdp.example.com")
+        XCTAssertEqual(editor.draft?.port, 3_389)
+        XCTAssertFalse(editor.canSave)
     }
 
     func testNewServerEditorDefaultsPortAndOnlyAutoNamesUntilUserEditsName() {

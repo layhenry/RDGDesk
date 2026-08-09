@@ -632,32 +632,40 @@ final class ServerPropertyEditorModel: ObservableObject {
             ? "名称不能为空。" : nil
     }
 
+    private var endpointResult: Result<
+        ServerEndpointInputResolution,
+        ServerEndpointInputValidationError
+    > {
+        do {
+            return .success(try ServerEndpointInputParser.resolve(
+                address: host,
+                portText: portText
+            ))
+        } catch let error as ServerEndpointInputValidationError {
+            return .failure(error)
+        } catch {
+            return .failure(.invalidHost)
+        }
+    }
+
     var hostError: String? {
-        let value = host.trimmingCharacters(in: .whitespacesAndNewlines)
-        let port = Int(portText.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 3_389
-        return (try? ServerPropertiesDraft(
-            displayName: name.isEmpty ? "Server" : name,
-            host: value,
-            port: port
-        ).validated()) == nil ? "请输入有效的 IP 地址或主机名。" : nil
+        guard case let .failure(error) = endpointResult,
+              error != .invalidPort else { return nil }
+        return error.message
     }
 
     var portError: String? {
-        let value = portText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let port = Int(value), (1...65_535).contains(port) else {
-            return "端口必须是 1–65535 之间的整数。"
-        }
-        return nil
+        guard case .failure(.invalidPort) = endpointResult else { return nil }
+        return ServerEndpointInputValidationError.invalidPort.message
     }
 
     var draft: ServerPropertiesDraft? {
-        guard nameError == nil, hostError == nil, portError == nil else { return nil }
-        let trimmedPort = portText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let port = Int(trimmedPort) else { return nil }
+        guard nameError == nil,
+              case let .success(endpoint) = endpointResult else { return nil }
         return try? ServerPropertiesDraft(
             displayName: name.trimmingCharacters(in: .whitespacesAndNewlines),
-            host: host.trimmingCharacters(in: .whitespacesAndNewlines),
-            port: port
+            host: endpoint.host,
+            port: endpoint.port
         ).validated()
     }
 

@@ -18,7 +18,7 @@ struct NewServerSheet: View {
                 TextField("名称", text: Binding(
                     get: { editor.name }, set: { editor.updateName($0) }
                 ))
-                TextField("IP 地址或域名", text: Binding(
+                TextField("IP 地址、域名或完整地址", text: Binding(
                     get: { editor.host }, set: { editor.updateHost($0) }
                 ))
                 TextField("端口", text: $editor.portText)

@@ -108,7 +108,7 @@ private struct ServerPropertySheet: View {
                     .accessibilityLabel("服务器名称")
             }
             PropertyField(label: "地址", error: editor.hostError) {
-                TextField("IP 地址或主机名", text: $editor.host)
+                TextField("IP 地址、域名或完整地址", text: $editor.host)
                     .textContentType(.URL)
                     .accessibilityLabel("服务器地址")
             }
