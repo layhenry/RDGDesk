@@ -62,12 +62,14 @@ final class ServerEndpointInputTests: XCTestCase {
     }
 
     func testEmbeddedPortIgnoresSeparatePortButPlainHostValidatesIt() throws {
-        let embedded = try ServerEndpointInputParser.resolve(
-            address: "q6id.cn:6609",
-            portText: "not-a-port"
-        )
-        XCTAssertEqual(embedded.port, 6_609)
-        XCTAssertTrue(embedded.usesEmbeddedPort)
+        for portText in ["", "3390", "not-a-port"] {
+            let embedded = try ServerEndpointInputParser.resolve(
+                address: "q6id.cn:6609",
+                portText: portText
+            )
+            XCTAssertEqual(embedded.port, 6_609)
+            XCTAssertTrue(embedded.usesEmbeddedPort)
+        }
 
         for portText in ["", "0", "65536", "not-a-port"] {
             XCTAssertThrowsError(

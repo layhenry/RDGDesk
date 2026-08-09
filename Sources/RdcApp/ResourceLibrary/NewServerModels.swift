@@ -39,7 +39,7 @@ final class NewServerEditorModel: ObservableObject {
         if !didEditName {
             name = (try? ServerEndpointInputParser.resolve(
                 address: value,
-                portText: portText
+                portText: "3389"
             ).host) ?? value.trimmingCharacters(in: .whitespacesAndNewlines)
         }
     }

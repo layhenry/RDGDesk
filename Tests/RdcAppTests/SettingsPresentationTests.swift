@@ -1917,6 +1917,22 @@ final class SettingsPresentationTests: XCTestCase {
         XCTAssertEqual(editor.draft?.host, "192.0.2.171")
     }
 
+    func testNewServerEditorAutoNameUnwrapsIPv6WhenSeparatePortIsRepaired() {
+        let editor = NewServerEditorModel()
+        editor.portText = ""
+
+        editor.updateHost("[2001:db8::10]")
+        editor.portText = "3390"
+
+        XCTAssertEqual(editor.name, "2001:db8::10")
+        XCTAssertEqual(
+            editor.draft,
+            ServerPropertiesDraft(
+                displayName: "2001:db8::10", host: "2001:db8::10", port: 3_390
+            )
+        )
+    }
+
     func testNewServerEditorUsesEmbeddedPortWithoutChangingPortField() {
         let editor = NewServerEditorModel()
 
