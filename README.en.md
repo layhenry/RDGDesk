@@ -17,7 +17,7 @@ RDGDesk is an independent native macOS remote desktop client compatible with `.r
 ## Current capabilities
 
 - Import, search, restore, and browse sanitized RDCMan-compatible libraries.
-- Add IPv4, IPv6, or DNS servers without an `.rdg` file. The first server creates a local “My Servers” library, group menus can add directly to a destination, and new servers inherit global credentials.
+- Add IPv4, IPv6, or DNS servers without an `.rdg` file. The address field accepts complete endpoints such as `q6id.cn:6609`, `192.168.1.10:6609`, and `[2001:db8::10]:6609`. The first server creates a local “My Servers” library, group menus can add directly to a destination, and new servers inherit global credentials.
 - Connect in the native canvas and forward pointer, wheel, scan-code keyboard, Chinese IME/Unicode, focus, full-screen, and resize events.
 - Send `Ctrl+Alt+Del`, explicitly send the local text clipboard, and receive remote text clipboard updates. Clipboard transfer is text-only and limited to 1 MB; local text is never sent automatically.
 - Save global, group, and server credentials. Passwords are generic-password items in macOS Keychain; the JSON configuration stores only non-sensitive metadata and bindings.
