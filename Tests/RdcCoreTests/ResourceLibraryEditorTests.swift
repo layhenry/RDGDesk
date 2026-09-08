@@ -75,6 +75,36 @@ final class ResourceLibraryEditorTests: XCTestCase {
         )
     }
 
+    func testImportedServerLegacySecurityOptInSurvivesReloadAndReimport() throws {
+        let imported = reimportFixture(includeNewServer: false)
+        let serverID = try XCTUnwrap(imported.root.groups[0].servers[0].id)
+        let edited = try ResourceLibraryEditor.updateServer(
+            in: imported,
+            id: serverID,
+            draft: .init(
+                displayName: "Kept",
+                host: "kept.example",
+                port: 3_389,
+                legacySecurityEnabled: true
+            )
+        )
+
+        let reloaded = try JSONDecoder().decode(
+            RdcLibrarySnapshot.self,
+            from: JSONEncoder().encode(edited)
+        )
+        let merged = ResourceLibraryEditor.mergeReimport(
+            existing: reloaded,
+            imported: reimportFixture(includeNewServer: true),
+            restoreDeletedItems: false
+        )
+        let request = try XCTUnwrap(
+            merged.makeLibrary().servers.first { $0.id == serverID }
+        ).connectionRequest
+
+        XCTAssertTrue(request.legacySecurityEnabled)
+    }
+
     func testCreateServerRejectsMissingGroupWithoutChangingSnapshot() throws {
         let snapshot = editableFixture()
         XCTAssertThrowsError(
