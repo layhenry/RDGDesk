@@ -935,6 +935,9 @@ int32_t rdc_client_connect(RDCFreeRDPClient *client,
         !freerdp_settings_set_uint32(settings, FreeRDP_DesktopWidth, width) ||
         !freerdp_settings_set_uint32(settings, FreeRDP_DesktopHeight, height) ||
         !freerdp_settings_set_uint32(settings, FreeRDP_ColorDepth, 32u) ||
+        !freerdp_settings_set_uint32(
+            settings, FreeRDP_TlsSecLevel,
+            configuration->legacy_security_enabled ? 0u : 1u) ||
         !freerdp_settings_set_bool(settings, FreeRDP_SoftwareGdi, TRUE) ||
         !freerdp_settings_set_bool(settings, FreeRDP_RedirectClipboard, TRUE) ||
         !freerdp_settings_set_bool(settings, FreeRDP_ExternalCertificateManagement, TRUE))
@@ -1186,6 +1189,13 @@ int32_t rdc_client_test_external_certificate_management_enabled(
                                      FreeRDP_ExternalCertificateManagement)
                ? 1
                : 0;
+}
+
+uint32_t rdc_client_test_tls_security_level(RDCFreeRDPClient *client) {
+    if (!client || !client->instance || !client->instance->context)
+        return UINT32_MAX;
+    return freerdp_settings_get_uint32(client->instance->context->settings,
+                                       FreeRDP_TlsSecLevel);
 }
 
 int32_t rdc_client_test_set_config_path(RDCFreeRDPClient *client,

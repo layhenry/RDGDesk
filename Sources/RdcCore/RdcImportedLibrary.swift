@@ -245,7 +245,8 @@ public struct RdcImportedLibrary: Equatable, Sendable {
                     displayName: server.displayName,
                     address: RdcServerAddress(server.address),
                     credentials: nil,
-                    groupPathIDs: currentGroupPathIDs
+                    groupPathIDs: currentGroupPathIDs,
+                    legacySecurityEnabled: server.legacySecurityEnabled == true
                 )
             )
         }
@@ -366,19 +367,22 @@ public struct RdcImportedServer: Equatable, Identifiable, Sendable {
     public let address: RdcServerAddress
     public let credentials: RdcLogonCredentials?
     public let groupPathIDs: [String]
+    public let legacySecurityEnabled: Bool
 
     public init(
         id: String,
         displayName: String,
         address: RdcServerAddress,
         credentials: RdcLogonCredentials?,
-        groupPathIDs: [String]
+        groupPathIDs: [String],
+        legacySecurityEnabled: Bool = false
     ) {
         self.id = id
         self.displayName = displayName
         self.address = address
         self.credentials = credentials
         self.groupPathIDs = groupPathIDs
+        self.legacySecurityEnabled = legacySecurityEnabled
     }
 
     public var connectionRequest: RdpConnectionRequest {
@@ -387,7 +391,8 @@ public struct RdcImportedServer: Equatable, Identifiable, Sendable {
             host: address.host,
             port: address.port,
             username: credentials?.userName,
-            domain: credentials?.domain
+            domain: credentials?.domain,
+            legacySecurityEnabled: legacySecurityEnabled
         )
     }
 }

@@ -22,9 +22,12 @@ struct NewServerSheet: View {
                     get: { editor.host }, set: { editor.updateHost($0) }
                 ))
                 TextField("端口", text: $editor.portText)
+                LegacySecurityCompatibilityToggle(
+                    isEnabled: $editor.legacySecurityEnabled
+                )
             }
             .formStyle(.grouped)
-            .frame(height: 170)
+            .frame(height: 245)
             if let error = editor.nameError ?? editor.hostError ?? editor.portError {
                 Text(error)
                     .font(.caption)
@@ -55,6 +58,6 @@ struct NewServerSheet: View {
             }
         }
         .padding(24)
-        .frame(width: 420)
+        .frame(width: 440)
     }
 }

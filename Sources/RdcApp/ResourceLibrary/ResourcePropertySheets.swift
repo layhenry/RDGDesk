@@ -117,6 +117,9 @@ private struct ServerPropertySheet: View {
                     .frame(width: 110)
                     .accessibilityLabel("服务器端口")
             }
+            LegacySecurityCompatibilityToggle(
+                isEnabled: $editor.legacySecurityEnabled
+            )
             CredentialPropertyRow(
                 summary: editor.credentialSummary,
                 isSaving: editor.isSaving,
@@ -269,7 +272,7 @@ private struct ResourcePropertySheetSurface<Content: View>: View {
             .scrollContentBackground(.hidden)
             .frame(
                 minHeight: title == RdcAccessibilityProfile.direction2.serverPropertiesTitle
-                    ? 260 : 180
+                    ? 335 : 180
             )
             .padding(18)
             .background(.background.opacity(0.76), in: RoundedRectangle(cornerRadius: 14))

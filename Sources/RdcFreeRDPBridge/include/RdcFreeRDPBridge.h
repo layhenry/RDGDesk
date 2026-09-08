@@ -49,6 +49,7 @@ typedef struct {
     const char *password;
     uint32_t desktop_width;
     uint32_t desktop_height;
+    uint32_t legacy_security_enabled;
 } RDCConnectionConfiguration;
 
 uint32_t rdc_freerdp_bridge_version(void);
@@ -81,6 +82,7 @@ int32_t rdc_client_test_invoke_certificate(RDCFreeRDPClient *client,
                                            uint32_t flags);
 int32_t rdc_client_test_external_certificate_management_enabled(
     RDCFreeRDPClient *client);
+uint32_t rdc_client_test_tls_security_level(RDCFreeRDPClient *client);
 int32_t rdc_client_test_set_config_path(RDCFreeRDPClient *client,
                                         const char *config_path);
 int32_t rdc_client_test_prepare_display_control(RDCFreeRDPClient *client);

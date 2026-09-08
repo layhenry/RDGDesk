@@ -24,6 +24,7 @@ RDGDesk is an independent native macOS remote desktop client compatible with `.r
 - Resolve credentials in this order: server override, nearest group, parent groups, global credential, then a one-time prompt.
 - Require an explicit certificate decision on first use or when a fingerprint changes. `信任一次` applies only to the current attempt; `始终信任` saves the endpoint SHA-256 pin; `取消` rejects the connection. A matching saved pin reconnects without a sheet.
 - Classify DNS, timeout, refused connection, TLS/protocol, certificate, authentication, remote-disconnect, Keychain, and configuration failures separately.
+- Optionally enable per-server legacy compatibility for older SHA-1/TLS configurations. It remains off by default and reduces security only for that connection.
 
 RDCMan passwords protected by Windows DPAPI are never decrypted on macOS and are removed from the restored local snapshot.
 

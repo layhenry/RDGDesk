@@ -189,7 +189,8 @@ public actor FreeRDPSessionEngine: RdpSessionEngine {
                     domain: transientCredential?.domain ?? request.domain,
                     password: transientCredential?.password,
                     desktopWidth: UInt32(viewport.width),
-                    desktopHeight: UInt32(viewport.height)
+                    desktopHeight: UInt32(viewport.height),
+                    legacySecurityEnabled: request.legacySecurityEnabled
                 )
                 return bridge.connect(configuration: configuration)
             }

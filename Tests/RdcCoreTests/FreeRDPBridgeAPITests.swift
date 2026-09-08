@@ -483,7 +483,8 @@ final class FreeRDPBridgeAPITests: XCTestCase {
         let connectResult = "127.0.0.1".withCString { host in
             var configuration = RDCConnectionConfiguration(
                 host: host, port: port, username: nil, domain: nil, password: nil,
-                desktop_width: 1024, desktop_height: 768
+                desktop_width: 1024, desktop_height: 768,
+                legacy_security_enabled: 0
             )
             return rdc_client_connect(client, &configuration)
         }
@@ -517,13 +518,44 @@ final class FreeRDPBridgeAPITests: XCTestCase {
         let configuration = FreeRDPConfiguration(
             host: "example.invalid", port: 3390,
             username: "user", domain: "DOMAIN", password: "secret",
-            desktopWidth: 1_440, desktopHeight: 900
+            desktopWidth: 1_440, desktopHeight: 900,
+            legacySecurityEnabled: true
         )
         XCTAssertEqual(configuration.port, 3390)
         XCTAssertEqual(configuration.password, "secret")
         withCConfiguration(configuration) { native in
             XCTAssertEqual(native.pointee.desktop_width, 1_440)
             XCTAssertEqual(native.pointee.desktop_height, 900)
+            XCTAssertEqual(
+                Mirror(reflecting: native.pointee)
+                    .descendant("legacy_security_enabled") as? UInt32,
+                1
+            )
+        }
+    }
+
+    func testNativeConnectSelectsTlsSecurityLevelPerConnection() {
+        for (enabled, expectedLevel): (UInt32, UInt32) in [(0, 1), (1, 0)] {
+            guard let client = rdc_client_create(nil, nil, nil, nil) else {
+                return XCTFail("Expected native client allocation to succeed")
+            }
+            "127.0.0.1".withCString { host in
+                var configuration = RDCConnectionConfiguration(
+                    host: host,
+                    port: 9,
+                    username: nil,
+                    domain: nil,
+                    password: nil,
+                    desktop_width: 1_024,
+                    desktop_height: 768,
+                    legacy_security_enabled: enabled
+                )
+
+                XCTAssertEqual(rdc_client_connect(client, &configuration), 0)
+                XCTAssertEqual(rdc_client_test_tls_security_level(client), expectedLevel)
+                rdc_client_disconnect(client)
+            }
+            rdc_client_destroy(client)
         }
     }
 
@@ -539,7 +571,8 @@ final class FreeRDPBridgeAPITests: XCTestCase {
         "example.invalid".withCString { host in
             var configuration = RDCConnectionConfiguration(
                 host: host, port: 3390, username: nil, domain: nil, password: nil,
-                desktop_width: 1024, desktop_height: 768
+                desktop_width: 1024, desktop_height: 768,
+                legacy_security_enabled: 0
             )
 
             XCTAssertEqual(rdc_client_connect(client, &configuration), 0)
@@ -695,7 +728,8 @@ final class FreeRDPBridgeAPITests: XCTestCase {
         "example.invalid".withCString { host in
             var configuration = RDCConnectionConfiguration(
                 host: host, port: 3390, username: nil, domain: nil, password: nil,
-                desktop_width: 1024, desktop_height: 768
+                desktop_width: 1024, desktop_height: 768,
+                legacy_security_enabled: 0
             )
             XCTAssertEqual(rdc_client_connect(client, &configuration), 0)
             XCTAssertEqual(probe.didStartConnecting.wait(timeout: .now() + 2), .success)

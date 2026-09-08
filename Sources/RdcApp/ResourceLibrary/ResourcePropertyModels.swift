@@ -607,6 +607,7 @@ final class ServerPropertyEditorModel: ObservableObject {
     @Published var name: String
     @Published var host: String
     @Published var portText: String
+    @Published var legacySecurityEnabled: Bool
     @Published var isSaving = false
     @Published private(set) var saveError: String?
 
@@ -618,12 +619,14 @@ final class ServerPropertyEditorModel: ObservableObject {
         let original = ServerPropertiesDraft(
             displayName: server.displayName,
             host: server.address.host,
-            port: port
+            port: port,
+            legacySecurityEnabled: server.legacySecurityEnabled
         )
         self.original = (try? original.validated()) ?? original
         name = server.displayName
         host = server.address.host
         portText = String(port)
+        legacySecurityEnabled = server.legacySecurityEnabled
         self.credentialSummary = credentialSummary
     }
 
@@ -665,7 +668,8 @@ final class ServerPropertyEditorModel: ObservableObject {
         return try? ServerPropertiesDraft(
             displayName: name.trimmingCharacters(in: .whitespacesAndNewlines),
             host: endpoint.host,
-            port: endpoint.port
+            port: endpoint.port,
+            legacySecurityEnabled: legacySecurityEnabled
         ).validated()
     }
 

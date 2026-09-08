@@ -11,6 +11,27 @@ private final class FakeFreeRDPBridge: FreeRDPBridgeAPI, @unchecked Sendable {
         let passwordWasPresent: Bool
         let desktopWidth: UInt32
         let desktopHeight: UInt32
+        let legacySecurityEnabled: Bool
+
+        init(
+            host: String,
+            port: UInt16,
+            username: String?,
+            domain: String?,
+            passwordWasPresent: Bool,
+            desktopWidth: UInt32,
+            desktopHeight: UInt32,
+            legacySecurityEnabled: Bool = false
+        ) {
+            self.host = host
+            self.port = port
+            self.username = username
+            self.domain = domain
+            self.passwordWasPresent = passwordWasPresent
+            self.desktopWidth = desktopWidth
+            self.desktopHeight = desktopHeight
+            self.legacySecurityEnabled = legacySecurityEnabled
+        }
     }
 
     private let lock = NSLock()
@@ -63,7 +84,8 @@ private final class FakeFreeRDPBridge: FreeRDPBridgeAPI, @unchecked Sendable {
                     domain: configuration.domain,
                     passwordWasPresent: configuration.password != nil,
                     desktopWidth: configuration.desktopWidth,
-                    desktopHeight: configuration.desktopHeight
+                    desktopHeight: configuration.desktopHeight,
+                    legacySecurityEnabled: configuration.legacySecurityEnabled
                 )
             )
             self.continuations[generation] = continuation
@@ -247,6 +269,29 @@ final class FreeRDPSessionEngineTests: XCTestCase {
         domain: "REQUEST"
     )
     private let viewport = RdpViewport(width: 1_440, height: 900)
+
+    func testLegacySecurityOptInReachesFreeRDPBridgeConfiguration() async throws {
+        let bridge = FakeFreeRDPBridge()
+        let engine = FreeRDPSessionEngine(bridge: bridge)
+        let request = RdpConnectionRequest(
+            serverID: "legacy-server",
+            host: "legacy.example",
+            port: 3_389,
+            username: nil,
+            domain: nil,
+            legacySecurityEnabled: true
+        )
+        let viewport = viewport
+        let task = Task {
+            try await engine.connect(request, credential: nil, viewport: viewport)
+        }
+        try await waitUntil { bridge.calls.connect == 1 }
+
+        XCTAssertEqual(bridge.snapshots.last?.legacySecurityEnabled, true)
+
+        task.cancel()
+        _ = await task.result
+    }
 
     func testCertificateChallengesAreLosslessAndTaggedWithExactAttemptAndSession() async throws {
         let bridge = FakeFreeRDPBridge()

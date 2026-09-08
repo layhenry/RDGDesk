@@ -109,19 +109,22 @@ public struct RdpConnectionRequest: Equatable, Sendable {
     public let port: Int?
     public let username: String?
     public let domain: String?
+    public let legacySecurityEnabled: Bool
 
     public init(
         serverID: String,
         host: String,
         port: Int?,
         username: String?,
-        domain: String?
+        domain: String?,
+        legacySecurityEnabled: Bool = false
     ) {
         self.serverID = serverID
         self.host = host
         self.port = port
         self.username = username
         self.domain = domain
+        self.legacySecurityEnabled = legacySecurityEnabled
     }
 }
 

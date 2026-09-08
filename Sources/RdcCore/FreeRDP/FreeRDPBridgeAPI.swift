@@ -9,6 +9,7 @@ public struct FreeRDPConfiguration: Equatable, Sendable {
     public let password: String?
     public let desktopWidth: UInt32
     public let desktopHeight: UInt32
+    public let legacySecurityEnabled: Bool
 
     public init(
         host: String,
@@ -17,7 +18,8 @@ public struct FreeRDPConfiguration: Equatable, Sendable {
         domain: String?,
         password: String?,
         desktopWidth: UInt32,
-        desktopHeight: UInt32
+        desktopHeight: UInt32,
+        legacySecurityEnabled: Bool = false
     ) {
         self.host = host
         self.port = port
@@ -26,6 +28,7 @@ public struct FreeRDPConfiguration: Equatable, Sendable {
         self.password = password
         self.desktopWidth = desktopWidth
         self.desktopHeight = desktopHeight
+        self.legacySecurityEnabled = legacySecurityEnabled
     }
 }
 
@@ -496,7 +499,8 @@ func withCConfiguration<Result>(
                         domain: domain,
                         password: password,
                         desktop_width: configuration.desktopWidth,
-                        desktop_height: configuration.desktopHeight
+                        desktop_height: configuration.desktopHeight,
+                        legacy_security_enabled: configuration.legacySecurityEnabled ? 1 : 0
                     )
                     return body(&configuration)
                 }

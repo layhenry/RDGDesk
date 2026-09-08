@@ -35,6 +35,46 @@ final class ResourceLibraryEditorTests: XCTestCase {
         XCTAssertTrue(snapshot.root.groups.first?.servers.contains { $0.id == result.serverID } == false)
     }
 
+    func testCreateAndUpdateServerPersistLegacySecurityOptIn() throws {
+        let snapshot = editableFixture()
+        let parentID = try XCTUnwrap(snapshot.root.groups.first?.id)
+        let creation = try ResourceLibraryEditor.createServer(
+            in: snapshot,
+            parentID: parentID,
+            draft: .init(
+                displayName: "Legacy",
+                host: "legacy.example",
+                port: 3_389,
+                legacySecurityEnabled: true
+            )
+        )
+        let created = try XCTUnwrap(
+            creation.snapshot.allServers.first { $0.id == creation.serverID }
+        )
+        XCTAssertEqual(created.legacySecurityEnabled, true)
+        XCTAssertTrue(
+            try XCTUnwrap(
+                creation.snapshot.makeLibrary().servers.first { $0.id == creation.serverID }
+            ).connectionRequest.legacySecurityEnabled
+        )
+
+        let updated = try ResourceLibraryEditor.updateServer(
+            in: creation.snapshot,
+            id: creation.serverID,
+            draft: .init(
+                displayName: "Legacy",
+                host: "legacy.example",
+                port: 3_389,
+                legacySecurityEnabled: false
+            )
+        )
+
+        XCTAssertNotEqual(
+            updated.allServers.first { $0.id == creation.serverID }?.legacySecurityEnabled,
+            true
+        )
+    }
+
     func testCreateServerRejectsMissingGroupWithoutChangingSnapshot() throws {
         let snapshot = editableFixture()
         XCTAssertThrowsError(

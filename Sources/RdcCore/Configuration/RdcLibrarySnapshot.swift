@@ -167,12 +167,14 @@ public struct RdcServerSnapshot: Codable, Equatable, Sendable {
     public var sourceFingerprint: String?
     public var displayName: String
     public var address: String
+    public var legacySecurityEnabled: Bool?
 
     init(server: RdcServer) {
         id = nil
         sourceFingerprint = nil
         displayName = server.displayName
         address = server.address.rawValue
+        legacySecurityEnabled = nil
     }
 
     func makeServer() -> RdcServer {

@@ -25,6 +25,7 @@ final class NewServerEditorModel: ObservableObject {
     @Published private(set) var name = ""
     @Published private(set) var host = ""
     @Published var portText = "3389"
+    @Published var legacySecurityEnabled = false
     @Published private(set) var isSaving = false
     @Published private(set) var saveError: String?
     private var didEditName = false
@@ -82,7 +83,8 @@ final class NewServerEditorModel: ObservableObject {
         return try? ServerPropertiesDraft(
             displayName: name,
             host: endpoint.host,
-            port: endpoint.port
+            port: endpoint.port,
+            legacySecurityEnabled: legacySecurityEnabled
         ).validated()
     }
 

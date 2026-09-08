@@ -1917,6 +1917,41 @@ final class SettingsPresentationTests: XCTestCase {
         XCTAssertEqual(editor.draft?.host, "192.0.2.171")
     }
 
+    func testNewServerEditorDefaultsLegacySecurityOffAndIncludesExplicitOptIn() {
+        let editor = NewServerEditorModel()
+        editor.updateHost("legacy.example")
+
+        XCTAssertFalse(editor.legacySecurityEnabled)
+
+        editor.legacySecurityEnabled = true
+
+        XCTAssertTrue(editor.canSave)
+        XCTAssertEqual(editor.draft?.legacySecurityEnabled, true)
+    }
+
+    func testServerPropertyEditorLoadsAndCanDisableLegacySecurityOptIn() {
+        let server = RdcImportedServer(
+            id: "legacy-server",
+            displayName: "Legacy",
+            address: RdcServerAddress("legacy.example:3389"),
+            credentials: nil,
+            groupPathIDs: ["root"],
+            legacySecurityEnabled: true
+        )
+        let editor = ServerPropertyEditorModel(
+            server: server,
+            credentialSummary: "继承凭据"
+        )
+
+        XCTAssertTrue(editor.legacySecurityEnabled)
+        XCTAssertFalse(editor.canSave)
+
+        editor.legacySecurityEnabled = false
+
+        XCTAssertTrue(editor.canSave)
+        XCTAssertEqual(editor.draft?.legacySecurityEnabled, false)
+    }
+
     func testNewServerEditorAutoNameUnwrapsIPv6WhenSeparatePortIsRepaired() {
         let editor = NewServerEditorModel()
         editor.portText = ""

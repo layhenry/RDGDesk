@@ -3,6 +3,58 @@ import XCTest
 @testable import RdcCore
 
 final class RdcLibrarySnapshotTests: XCTestCase {
+    func testLegacySecurityCompatibilityOptInSurvivesSnapshotRoundTrip() throws {
+        var object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: legacySnapshotJSON()) as? [String: Any]
+        )
+        var root = try XCTUnwrap(object["root"] as? [String: Any])
+        var groups = try XCTUnwrap(root["groups"] as? [[String: Any]])
+        var servers = try XCTUnwrap(groups[0]["servers"] as? [[String: Any]])
+        servers[0]["legacySecurityEnabled"] = true
+        groups[0]["servers"] = servers
+        root["groups"] = groups
+        object["root"] = root
+
+        let decoded = try JSONDecoder().decode(
+            RdcLibrarySnapshot.self,
+            from: JSONSerialization.data(withJSONObject: object)
+        )
+        let roundTripped = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: JSONEncoder().encode(decoded))
+                as? [String: Any]
+        )
+        let encodedRoot = try XCTUnwrap(roundTripped["root"] as? [String: Any])
+        let encodedGroups = try XCTUnwrap(encodedRoot["groups"] as? [[String: Any]])
+        let encodedServers = try XCTUnwrap(encodedGroups[0]["servers"] as? [[String: Any]])
+
+        XCTAssertEqual(encodedServers[0]["legacySecurityEnabled"] as? Bool, true)
+    }
+
+    func testLegacySecurityCompatibilityOptInReachesConnectionRequest() throws {
+        var object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: legacySnapshotJSON()) as? [String: Any]
+        )
+        var root = try XCTUnwrap(object["root"] as? [String: Any])
+        var groups = try XCTUnwrap(root["groups"] as? [[String: Any]])
+        var servers = try XCTUnwrap(groups[0]["servers"] as? [[String: Any]])
+        servers[0]["legacySecurityEnabled"] = true
+        groups[0]["servers"] = servers
+        root["groups"] = groups
+        object["root"] = root
+        let snapshot = try JSONDecoder().decode(
+            RdcLibrarySnapshot.self,
+            from: JSONSerialization.data(withJSONObject: object)
+        )
+
+        let server = try XCTUnwrap(snapshot.makeLibrary().servers.first)
+
+        XCTAssertEqual(
+            Mirror(reflecting: server.connectionRequest)
+                .descendant("legacySecurityEnabled") as? Bool,
+            true
+        )
+    }
+
     func testLegacySnapshotNormalizesStableIDsAndPreservesThemAfterMutableEdits() throws {
         let legacy = try JSONDecoder().decode(
             RdcLibrarySnapshot.self,

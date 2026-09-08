@@ -5,11 +5,18 @@ public struct ServerPropertiesDraft: Equatable, Sendable {
     public var displayName: String
     public var host: String
     public var port: Int
+    public var legacySecurityEnabled: Bool
 
-    public init(displayName: String, host: String, port: Int) {
+    public init(
+        displayName: String,
+        host: String,
+        port: Int,
+        legacySecurityEnabled: Bool = false
+    ) {
         self.displayName = displayName
         self.host = host
         self.port = port
+        self.legacySecurityEnabled = legacySecurityEnabled
     }
 
     public func validated() throws -> ServerPropertiesDraft {
@@ -32,7 +39,12 @@ public struct ServerPropertiesDraft: Equatable, Sendable {
         guard (1...65_535).contains(port) else {
             throw ResourceLibraryEditError.invalidPort
         }
-        return ServerPropertiesDraft(displayName: trimmedName, host: trimmedHost, port: port)
+        return ServerPropertiesDraft(
+            displayName: trimmedName,
+            host: trimmedHost,
+            port: port,
+            legacySecurityEnabled: legacySecurityEnabled
+        )
     }
 }
 
@@ -179,6 +191,7 @@ public enum ResourceLibraryEditor {
             ))
             server.id = serverID
             server.sourceFingerprint = nil
+            server.legacySecurityEnabled = validated.legacySecurityEnabled ? true : nil
             parent.servers.append(server)
             return true
         }) else {
@@ -217,6 +230,8 @@ public enum ResourceLibraryEditor {
             let serializedHost = validated.host.contains(":")
                 ? "[\(validated.host)]" : validated.host
             group.servers[index].address = "\(serializedHost):\(validated.port)"
+            group.servers[index].legacySecurityEnabled = validated.legacySecurityEnabled
+                ? true : nil
             return true
         }) else {
             throw ResourceLibraryEditError.missingResource
